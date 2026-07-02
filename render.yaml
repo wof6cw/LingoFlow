@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: lingoflow
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false   # Renderのダッシュボードで手入力する
+      - key: PYTHON_VERSION
+        value: 3.13.4

@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(curl.exe -s -X POST -H \"Content-Type: application/json\" --data-binary \"@-\" http://127.0.0.1:8123/api/chat <# stdin not supported here #>; $wc = New-Object System.Net.WebClient; $wc.Headers.Add\\(\"Content-Type\",\"application/json\"\\); try { $wc.UploadString\\(\"http://127.0.0.1:8123/api/chat\", '{\"scenario_id\":null,\"messages\":[{\"role\":\"user\",\"text\":\"Hello\"}]}'\\) } catch { $resp = $_.Exception.InnerException.Response; if \\($resp\\) { \\(New-Object System.IO.StreamReader\\($resp.GetResponseStream\\(\\)\\)\\).ReadToEnd\\(\\) } else { $_.Exception.Message } })"
+    ]
+  }
+}

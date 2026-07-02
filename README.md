@@ -1,0 +1,73 @@
+# LingoFlow 🎙️
+
+自分専用のAI英語スピーキング練習アプリ。完全無料構成（Gemini API無料枠 + Render無料プラン、クレジットカード登録不要）。
+
+## 機能（v1）
+
+- **シナリオ練習**: 場面別（空港・レストラン・面接など5シナリオ）に
+  **①シャドーイング → ②ロールプレイ会話 → ③AIフィードバック** の3ステップで練習
+- **AIフリートーク**: 好きな話題で自由会話。**音声モード／チャットモード**切替対応（通勤中はチャットで）
+- **総合フィードバック**: 会話終了時にスコア・文法修正・より自然な表現・流暢さ講評（日本語）
+- **練習記録**: ストリーク（連続日数）・セッション履歴
+- **学習パス**: カテゴリ別のシナリオ一覧（Skill Treeの土台）
+
+シナリオのフレーズ・会話はすべてGeminiが動的生成（著作権フリー・追加が容易）。
+シナリオを増やすには [app/scenarios.py](app/scenarios.py) の `SCENARIOS` にエントリを足すだけ。
+
+## セットアップ（ローカル）
+
+```powershell
+# 1. 依存のインストール
+.venv\Scripts\pip install -r requirements.txt
+
+# 2. APIキーの設定
+copy .env.example .env
+# .env を開いて GEMINI_API_KEY を設定（https://aistudio.google.com/apikey で無料発行）
+
+# 3. 起動
+.venv\Scripts\uvicorn app.main:app --reload
+```
+
+ブラウザで http://127.0.0.1:8000 を開く（**Chrome推奨** — 音声認識がWeb Speech API依存のため）。
+
+## Renderへのデプロイ（無料・カード不要）
+
+1. このリポジトリをGitHubにpush
+2. [Render](https://render.com) にGitHubアカウントでサインアップ
+3. **New → Web Service** でリポジトリを選択（`render.yaml` を自動検出）
+4. 環境変数 `GEMINI_API_KEY` をダッシュボードで設定
+5. デプロイ完了後、発行されたURLにアクセス（スマホからもOK）
+
+### 無料枠の注意点
+
+- **コールドスタート**: 無操作15分でスリープし、次回アクセスに数十秒かかる
+- **ディスクが揮発性**: SQLite（練習履歴・ストリーク）は**再デプロイやスリープ復帰で消えることがある**。
+  履歴を確実に残したい場合はローカル起動で使うか、将来的に無料の外部DB（Turso等）への移行を検討
+- **Gemini無料枠**: Google Cloud側でプロジェクトに課金を有効化すると無料枠が消えるため、
+  Geminiのプロジェクトは無課金のまま維持すること
+
+## 技術構成
+
+| レイヤー | 技術 |
+|---|---|
+| フロントエンド | バニラJS SPA（レスポンシブ、ビルド不要） |
+| 音声認識/合成 | Web Speech API（ブラウザ標準・無料） |
+| AI | Gemini API（`gemini-2.5-flash`、REST直叩き） |
+| バックエンド | Python / FastAPI |
+| DB | SQLite（シナリオキャッシュ＋練習履歴） |
+| ホスティング | Render.com 無料Webサービス |
+
+APIキーはバックエンドの環境変数でのみ保持し、フロントエンドには一切渡らない。
+
+## 主なファイル
+
+```
+app/
+  main.py       # FastAPI ルート定義
+  gemini.py     # Gemini API連携（シナリオ生成・会話・フィードバック）
+  scenarios.py  # シナリオのシード定義（場面設定のみ。追加はここ）
+  db.py         # SQLite（キャッシュ・履歴・ストリーク計算）
+static/
+  index.html / style.css / app.js   # フロントエンド一式
+render.yaml     # Renderデプロイ設定
+```

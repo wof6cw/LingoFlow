@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>LingoFlow — AIスピーキング練習</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎙️</text></svg>">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- ホーム -->
+  <section id="view-home" class="view">
+    <header class="home-header">
+      <div>
+        <h1 id="greeting">こんにちは！</h1>
+        <p class="sub">今日も英語を話しましょう</p>
+      </div>
+    </header>
+    <div class="stat-row">
+      <div class="stat-chip"><span class="stat-icon">🔥</span><b id="stat-streak">0</b><span class="stat-label">日連続</span></div>
+      <div class="stat-chip"><span class="stat-icon">✅</span><b id="stat-today">0</b><span class="stat-label">今日</span></div>
+      <div class="stat-chip"><span class="stat-icon">📚</span><b id="stat-total">0</b><span class="stat-label">合計</span></div>
+    </div>
+
+    <div class="card free-talk-card" id="btn-free-talk" role="button" tabindex="0">
+      <div class="ft-icon">💬</div>
+      <div>
+        <b>AIフリートーク</b>
+        <p class="sub">好きな話題で自由に会話（音声・チャット両対応）</p>
+      </div>
+      <span class="chev">›</span>
+    </div>
+
+    <h2 class="section-title">学習パス</h2>
+    <div id="learning-path"></div>
+  </section>
+
+  <!-- シナリオ詳細 -->
+  <section id="view-intro" class="view hidden">
+    <header class="page-header">
+      <button class="btn-back" data-back="home">‹</button>
+      <h1 id="intro-title"></h1>
+    </header>
+    <div class="card intro-card">
+      <div class="intro-icon" id="intro-icon"></div>
+      <span class="badge" id="intro-level"></span>
+      <p id="intro-desc"></p>
+      <div class="intro-steps">
+        <div class="step"><span class="step-num">1</span>シャドーイング<span class="step-note">重要フレーズを音読練習</span></div>
+        <div class="step"><span class="step-num">2</span>フリートーク<span class="step-note">AIとロールプレイ会話</span></div>
+        <div class="step"><span class="step-num">3</span>フィードバック<span class="step-note">文法・表現・流暢さを講評</span></div>
+      </div>
+      <button class="btn-primary" id="btn-start-shadowing">シャドーイングから始める</button>
+      <button class="btn-ghost" id="btn-skip-to-talk">会話から始める（スキップ）</button>
+    </div>
+  </section>
+
+  <!-- シャドーイング -->
+  <section id="view-shadowing" class="view hidden">
+    <header class="page-header">
+      <button class="btn-back" data-back="intro">‹</button>
+      <h1>シャドーイング</h1>
+      <span class="progress-label" id="shadow-progress"></span>
+    </header>
+    <div class="progress-bar"><div id="shadow-bar"></div></div>
+    <div class="card phrase-card">
+      <p class="phrase-en" id="phrase-en"></p>
+      <p class="phrase-ja" id="phrase-ja"></p>
+      <div class="phrase-actions">
+        <button class="btn-round" id="btn-listen" title="お手本を聞く">🔊</button>
+        <button class="btn-round btn-mic" id="btn-shadow-mic" title="発音する">🎤</button>
+      </div>
+      <p class="mic-hint" id="shadow-hint">🔊 でお手本を聞いて、🎤 を押して発音しましょう</p>
+      <div id="shadow-result" class="hidden">
+        <div class="accuracy" id="shadow-accuracy"></div>
+        <p class="recognized" id="shadow-recognized"></p>
+      </div>
+    </div>
+    <div class="shadow-nav">
+      <button class="btn-ghost" id="btn-phrase-prev">‹ 前へ</button>
+      <button class="btn-primary" id="btn-phrase-next">次へ ›</button>
+    </div>
+  </section>
+
+  <!-- 会話（ロールプレイ / フリートーク） -->
+  <section id="view-talk" class="view hidden">
+    <header class="page-header">
+      <button class="btn-back" id="btn-talk-back">‹</button>
+      <h1 id="talk-title"></h1>
+      <div class="mode-toggle">
+        <button id="mode-voice" class="active">🎤 音声</button>
+        <button id="mode-text">⌨️ チャット</button>
+      </div>
+    </header>
+    <div id="chat-log"></div>
+    <div class="talk-footer">
+      <button class="btn-finish" id="btn-finish-talk">✔ 会話を終えてフィードバック</button>
+      <div id="voice-input" class="voice-input">
+        <button class="btn-big-mic" id="btn-talk-mic">🎤</button>
+        <p class="mic-hint" id="talk-hint">タップして話す</p>
+      </div>
+      <div id="text-input" class="text-input hidden">
+        <input type="text" id="chat-text" placeholder="英語で入力…" autocomplete="off">
+        <button class="btn-send" id="btn-send">➤</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- フィードバック -->
+  <section id="view-feedback" class="view hidden">
+    <header class="page-header">
+      <h1>フィードバック</h1>
+    </header>
+    <div id="feedback-body"></div>
+    <button class="btn-primary" id="btn-feedback-done">完了してホームへ</button>
+  </section>
+
+  <!-- 記録 -->
+  <section id="view-stats" class="view hidden">
+    <header class="page-header"><h1>練習の記録</h1></header>
+    <div class="stat-row">
+      <div class="stat-chip"><span class="stat-icon">🔥</span><b id="stats2-streak">0</b><span class="stat-label">日連続</span></div>
+      <div class="stat-chip"><span class="stat-icon">✅</span><b id="stats2-today">0</b><span class="stat-label">今日</span></div>
+      <div class="stat-chip"><span class="stat-icon">📚</span><b id="stats2-total">0</b><span class="stat-label">合計</span></div>
+    </div>
+    <h2 class="section-title">最近のセッション</h2>
+    <div id="history-list"></div>
+  </section>
+
+  <!-- ローディング / エラー -->
+  <div id="loading" class="overlay hidden"><div class="spinner"></div><p id="loading-text">読み込み中…</p></div>
+  <div id="toast" class="toast hidden"></div>
+
+  <!-- 下部ナビ -->
+  <nav class="bottom-nav">
+    <button data-nav="home" class="active"><span>🏠</span>ホーム</button>
+    <button data-nav="free"><span>💬</span>フリートーク</button>
+    <button data-nav="stats"><span>📈</span>記録</button>
+  </nav>
+</div>
+<script src="app.js"></script>
+</body>
+</html>
