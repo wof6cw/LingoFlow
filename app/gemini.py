@@ -83,12 +83,19 @@ def _api_key() -> str:
     return key
 
 
-def _model() -> str:
-    return os.environ.get("GEMINI_MODEL", DEFAULT_MODEL)
+def _models() -> list[str]:
+    """試行順のモデル一覧。混雑・レート制限時はフォールバックモデルも試す。"""
+    primary = os.environ.get("GEMINI_MODEL", DEFAULT_MODEL)
+    fallback = os.environ.get("GEMINI_FALLBACK_MODEL", "gemini-2.0-flash")
+    return [primary] if fallback == primary else [primary, fallback]
 
 
 def _generate(system: str, contents: list[dict], json_mode: bool = False) -> str:
-    """generateContent を呼び、テキスト部分を返す。"""
+    """generateContent を呼び、テキスト部分を返す。
+
+    無料枠では一時的な混雑(503)・レート制限(429)が起きやすいため、
+    プライマリモデルで2回試した後、フォールバックモデルでも試す。
+    """
     body: dict = {
         "systemInstruction": {"parts": [{"text": system}]},
         "contents": contents,
@@ -97,32 +104,34 @@ def _generate(system: str, contents: list[dict], json_mode: bool = False) -> str
     if json_mode:
         body["generationConfig"]["responseMimeType"] = "application/json"
 
-    url = f"{BASE_URL}/{_model()}:generateContent"
     headers = {"x-goog-api-key": _api_key()}
-
     last_error = ""
-    for attempt in range(2):
-        try:
-            resp = httpx.post(url, json=body, headers=headers, timeout=60)
-        except httpx.HTTPError as e:
-            last_error = f"通信エラー: {e}"
-            continue
-        if resp.status_code == 200:
-            data = resp.json()
+    for model in _models():
+        url = f"{BASE_URL}/{model}:generateContent"
+        for attempt in range(2):
             try:
-                return data["candidates"][0]["content"]["parts"][0]["text"]
-            except (KeyError, IndexError):
-                raise HTTPException(502, "Geminiの応答形式が想定外でした。")
-        if resp.status_code in (429, 500, 503) and attempt == 0:
-            time.sleep(3)  # 無料枠のレート制限は少し待つと通ることが多い
-            last_error = f"HTTP {resp.status_code}"
-            continue
-        detail = resp.json().get("error", {}).get("message", resp.text[:200]) \
-            if resp.headers.get("content-type", "").startswith("application/json") \
-            else resp.text[:200]
-        raise HTTPException(502, f"Gemini APIエラー (HTTP {resp.status_code}): {detail}")
+                resp = httpx.post(url, json=body, headers=headers, timeout=60)
+            except httpx.HTTPError as e:
+                last_error = f"通信エラー: {e}"
+                continue
+            if resp.status_code == 200:
+                data = resp.json()
+                try:
+                    return data["candidates"][0]["content"]["parts"][0]["text"]
+                except (KeyError, IndexError):
+                    raise HTTPException(502, "Geminiの応答形式が想定外でした。")
+            if resp.status_code in (429, 500, 503):
+                last_error = f"HTTP {resp.status_code} ({model})"
+                if attempt == 0:
+                    time.sleep(3)  # 少し待つと通ることが多い
+                continue  # 2回失敗したら次のモデルへ
+            detail = resp.json().get("error", {}).get("message", resp.text[:200]) \
+                if resp.headers.get("content-type", "").startswith("application/json") \
+                else resp.text[:200]
+            raise HTTPException(502, f"Gemini APIエラー (HTTP {resp.status_code}): {detail}")
 
-    raise HTTPException(502, f"Gemini APIに接続できませんでした（{last_error}）。少し待って再試行してください。")
+    raise HTTPException(
+        502, f"Gemini APIが混雑しています（{last_error}）。少し待って再試行してください。")
 
 
 def _parse_json(text: str) -> dict:
@@ -205,19 +214,35 @@ Rules:
     return _generate(system, _history_to_contents(messages)).strip()
 
 
-def free_chat_reply(messages: list[dict], difficulty: str = "intermediate") -> str:
+def free_chat_reply(messages: list[dict], difficulty: str = "intermediate") -> dict:
+    """フリートークの返答。英語の返答と日本語訳を1回の呼び出しで生成する。
+
+    戻り値: {"english": str, "japanese": str | None}
+    """
     d = _difficulty(difficulty)
     system = f"""You are a friendly English conversation partner for a Japanese learner
 (TOEIC ~890, weak at speaking) practicing free conversation.
 
-Rules:
-- Natural spoken English only. Never use Japanese.
-- Keep every reply SHORT: 1-3 sentences, like a real chat.
+Rules for your reply:
+- Natural spoken English. Keep it SHORT: 1-3 sentences, like a real chat.
 - Learner level: {d['label']} ({d['cefr']}). Language style: {d['speaking_style']}
 - Always end with a question or a hook so the learner keeps talking.
 - Do NOT correct mistakes during the conversation (feedback comes later).
-- Be warm, curious, and encouraging. Vary topics naturally."""
-    return _generate(system, _history_to_contents(messages)).strip()
+- Be warm, curious, and encouraging. Vary topics naturally.
+
+Output format: JSON only, exactly this shape:
+{{"english": "<your reply in English>", "japanese": "<そのreplyの自然な日本語訳>"}}"""
+    text = _generate(system, _history_to_contents(messages), json_mode=True)
+    try:
+        data = _parse_json(text)
+    except HTTPException:
+        data = {}
+    english = str(data.get("english") or "").strip()
+    if not english:
+        # JSONで返らなかった場合は本文をそのまま英語返答として扱う（訳なし）
+        return {"english": text.strip(), "japanese": None}
+    japanese = str(data.get("japanese") or "").strip() or None
+    return {"english": english, "japanese": japanese}
 
 
 # ---------------------------------------------------------------- フィードバック

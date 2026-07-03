@@ -141,6 +141,49 @@ function stopListening() {
   if (activeRec) activeRec.stop();
 }
 
+/* ================================================================ 自分の発話の録音 (MediaRecorder)
+
+   Web Speech APIは文字起こしのみで音声自体は取れないため、
+   MediaRecorderを並行して走らせて聞き返し用の音声を作る。
+   音声はセッション中のみ保持し、サーバーには送らない（都度破棄）。 */
+
+async function startAudioRecorder() {
+  if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+    return null;
+  }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const recorder = new MediaRecorder(stream);
+    const chunks = [];
+    recorder.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+    recorder.start();
+    const release = () => stream.getTracks().forEach((t) => t.stop());
+    return {
+      // 停止して再生用URLを返す（録れていなければ null）
+      stop: () => new Promise((resolve) => {
+        recorder.onstop = () => {
+          release();
+          resolve(chunks.length
+            ? URL.createObjectURL(new Blob(chunks, { type: recorder.mimeType }))
+            : null);
+        };
+        try { recorder.stop(); } catch (_) { release(); resolve(null); }
+      }),
+      cancel: () => {
+        recorder.onstop = null;
+        try { recorder.stop(); } catch (_) {}
+        release();
+      },
+    };
+  } catch (_) {
+    return null; // 録音できなくても文字起こしだけで続行する
+  }
+}
+
+function revokeAudio(url) {
+  if (url) URL.revokeObjectURL(url);
+}
+
 /* ================================================================ ホーム */
 
 async function loadHome() {
@@ -267,6 +310,7 @@ function renderPhrase() {
   $("shadow-bar").style.width = `${((i + 1) / phrases.length) * 100}%`;
   $("phrase-en").textContent = p.en;
   $("phrase-ja").textContent = p.ja;
+  clearShadowAudio();
   $("shadow-result").classList.add("hidden");
   $("shadow-hint").classList.remove("hidden");
   $("btn-phrase-prev").disabled = i === 0;
@@ -310,22 +354,41 @@ function speakPraise() {
   toast("🎉 Good! その調子です");
 }
 
-function toggleShadowMic() {
+let shadowAudioUrl = null;
+let shadowPlayer = null;
+
+function clearShadowAudio() {
+  if (shadowPlayer) { shadowPlayer.pause(); shadowPlayer = null; }
+  revokeAudio(shadowAudioUrl);
+  shadowAudioUrl = null;
+  $("btn-shadow-replay").classList.add("hidden");
+}
+
+async function toggleShadowMic() {
   const btn = $("btn-shadow-mic");
   if (activeRec) { stopListening(); return; }
+  clearShadowAudio();
   btn.classList.add("recording");
   $("shadow-hint").textContent = "録音中… もう一度タップで停止";
   $("shadow-hint").classList.remove("hidden");
+  const recorder = await startAudioRecorder(); // 聞き返し用に並行録音
+  const done = async () => {
+    btn.classList.remove("recording");
+    $("shadow-hint").textContent = "🔊 でお手本を聞いて、🎤 を押して発音しましょう";
+    if (recorder) {
+      shadowAudioUrl = await recorder.stop();
+      $("btn-shadow-replay").classList.toggle("hidden", !shadowAudioUrl);
+    }
+  };
   listen({
     onResult: () => {},
-    onEnd: (text) => {
-      btn.classList.remove("recording");
-      $("shadow-hint").textContent = "🔊 でお手本を聞いて、🎤 を押して発音しましょう";
+    onEnd: async (text) => {
+      await done();
       showShadowResult(text);
     },
-    onError: (msg) => {
-      btn.classList.remove("recording");
-      $("shadow-hint").textContent = "🔊 でお手本を聞いて、🎤 を押して発音しましょう";
+    onError: async (msg) => {
+      await done();
+      clearShadowAudio();
       toast(msg);
     },
   });
@@ -340,6 +403,7 @@ async function startTalk({ free = false } = {}) {
     state.difficulty = "intermediate";
   }
   state.messages = [];
+  clearShadowAudio();
   $("chat-log").innerHTML = "";
   $("talk-title").textContent = state.scenario ? state.scenario.title_ja : "AIフリートーク";
   setVoiceMode(state.voiceMode && sttSupported);
@@ -352,12 +416,13 @@ async function startTalk({ free = false } = {}) {
     if (!(await fetchContent())) { show("intro"); return; }
     addMessage("ai", state.content.opening_line);
   } else {
-    addMessage("ai", "Hi! Great to see you. What's on your mind today? 😊");
+    addMessage("ai", "Hi! Great to see you. What's on your mind today? 😊",
+      "やあ！会えてうれしいです。今日はどんなことを話しましょうか？ 😊");
   }
 }
 
-function addMessage(role, text) {
-  state.messages.push({ role, text });
+function addMessage(role, text, ja = null) {
+  state.messages.push({ role, text }); // 履歴・API送信は英語のみ
   const log = $("chat-log");
   const div = document.createElement("div");
   div.className = `bubble ${role}`;
@@ -369,6 +434,21 @@ function addMessage(role, text) {
     replay.title = "もう一度聞く";
     replay.addEventListener("click", (e) => { e.stopPropagation(); speak(text); });
     div.appendChild(replay);
+    if (ja) {
+      const btn = document.createElement("button");
+      btn.className = "btn-trans";
+      btn.textContent = "訳を見る";
+      const jaDiv = document.createElement("div");
+      jaDiv.className = "bubble-ja hidden";
+      jaDiv.textContent = ja;
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const hidden = jaDiv.classList.toggle("hidden");
+        btn.textContent = hidden ? "訳を見る" : "訳を隠す";
+      });
+      div.appendChild(btn);
+      div.appendChild(jaDiv);
+    }
     if (state.voiceMode) speak(text);
   }
   log.appendChild(div);
@@ -398,7 +478,7 @@ async function sendUserMessage(text) {
       }),
     });
     typing.remove();
-    addMessage("ai", data.reply);
+    addMessage("ai", data.reply, data.reply_ja);
   } catch (e) {
     typing.remove();
     state.messages.pop(); // 失敗した発話は取り消して再送できるように
@@ -412,32 +492,147 @@ function setVoiceMode(on) {
   state.voiceMode = on;
   $("mode-voice").classList.toggle("active", on);
   $("mode-text").classList.toggle("active", !on);
-  $("voice-input").classList.toggle("hidden", !on);
   $("text-input").classList.toggle("hidden", on);
-  if (!on) { speechSynthesis.cancel(); stopListening(); }
+  if (!on) speechSynthesis.cancel();
+  cancelVoiceTurn(); // モード切替時は進行中の録音・確認を破棄（updateVoiceUIも呼ばれる）
 }
 
-function toggleTalkMic() {
+/* ---------------- 発話ターン（録音 → 確認 → 送信）の状態機械
+
+   誤終了対策として認識は continuous + 自動再開で走らせ、
+   終了は「マイクボタン再タップ」または「発話後しばらく無音」。
+   終了後すぐには送信せず、確認パネル（再生/やり直し/送信）を挟む。 */
+
+const turn = {
+  phase: "idle",        // idle | recording | confirm
+  rec: null,
+  recorder: null,
+  finalText: "",
+  interim: "",
+  manualStop: false,
+  silenceTimer: null,
+  audioUrl: null,
+  player: null,
+};
+
+const SILENCE_AUTO_FINISH_MS = 3000;
+
+function updateVoiceUI() {
   const btn = $("btn-talk-mic");
-  if (activeRec) { stopListening(); return; }
-  btn.classList.add("recording");
   const hint = $("talk-hint");
-  hint.textContent = "録音中… もう一度タップで送信";
-  listen({
-    onResult: (finalText, interim) => {
-      hint.textContent = (finalText + interim) || "録音中… もう一度タップで送信";
-    },
-    onEnd: (text) => {
-      btn.classList.remove("recording");
-      hint.textContent = "タップして話す";
-      if (text) sendUserMessage(text);
-    },
-    onError: (msg) => {
-      btn.classList.remove("recording");
-      hint.textContent = "タップして話す";
-      toast(msg);
-    },
-  });
+  const live = $("live-transcript");
+  const recording = turn.phase === "recording";
+  $("voice-input").classList.toggle("hidden", !state.voiceMode || turn.phase === "confirm");
+  $("voice-confirm").classList.toggle("hidden", !state.voiceMode || turn.phase !== "confirm");
+  btn.classList.toggle("recording", recording);
+  btn.textContent = recording ? "⏹" : "🎤";
+  hint.textContent = recording ? "話し終わったらタップ" : "タップして話す";
+  live.classList.toggle("hidden", !recording);
+  if (recording) {
+    live.textContent = (turn.finalText + turn.interim).trim() || "聞き取り中…";
+  }
+}
+
+async function startVoiceTurn() {
+  if (turn.phase !== "idle") return;
+  if (!sttSupported) {
+    toast("このブラウザは音声認識に対応していません。チャットモードをご利用ください。");
+    return;
+  }
+  speechSynthesis.cancel();
+  turn.finalText = "";
+  turn.interim = "";
+  turn.manualStop = false;
+  turn.phase = "recording";
+  updateVoiceUI();
+
+  turn.recorder = await startAudioRecorder(); // 録音は取れなくても続行
+
+  const rec = new SR();
+  rec.lang = "en-US";
+  rec.continuous = true;      // ひと区切りごとの自動停止（誤終了の主因）を防ぐ
+  rec.interimResults = true;
+  rec.onresult = (e) => {
+    turn.interim = "";
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const r = e.results[i];
+      if (r.isFinal) turn.finalText += r[0].transcript + " ";
+      else turn.interim += r[0].transcript;
+    }
+    updateVoiceUI();
+    // 発話が取れた後しばらく無音が続いたら自動で確認へ
+    clearTimeout(turn.silenceTimer);
+    if (turn.finalText.trim()) {
+      turn.silenceTimer = setTimeout(finishVoiceTurn, SILENCE_AUTO_FINISH_MS);
+    }
+  };
+  rec.onerror = (e) => {
+    if (e.error === "not-allowed" || e.error === "service-not-allowed") {
+      cancelVoiceTurn();
+      toast("マイクの使用が許可されていません。ブラウザの設定を確認してください。");
+    }
+    // no-speech / aborted / network などは onend の自動再開に任せる
+  };
+  rec.onend = () => {
+    // Chromeは無音区間で内部的にセッションを区切ることがあるため、
+    // ユーザーが終了していなければ自動で認識を再開する
+    if (turn.phase === "recording" && !turn.manualStop) {
+      try { rec.start(); } catch (_) {}
+    }
+  };
+  turn.rec = rec;
+  try { rec.start(); } catch (_) {}
+}
+
+async function finishVoiceTurn() {
+  if (turn.phase !== "recording") return;
+  turn.manualStop = true;
+  clearTimeout(turn.silenceTimer);
+  // stop() 後に確定途中の結果が届くことがあるので onend まで待つ
+  if (turn.rec) {
+    await new Promise((resolve) => {
+      const timeout = setTimeout(resolve, 1000);
+      turn.rec.onend = () => { clearTimeout(timeout); resolve(); };
+      try { turn.rec.stop(); } catch (_) { clearTimeout(timeout); resolve(); }
+    });
+    turn.rec = null;
+  }
+  turn.audioUrl = turn.recorder ? await turn.recorder.stop() : null;
+  turn.recorder = null;
+  turn.phase = "confirm";
+  renderVoiceConfirm();
+}
+
+function renderVoiceConfirm() {
+  const text = (turn.finalText + turn.interim).trim();
+  const el = $("confirm-text");
+  el.textContent = text || "（聞き取れませんでした。やり直してください）";
+  el.classList.toggle("empty", !text);
+  $("btn-send-voice").disabled = !text;
+  $("btn-replay-self").disabled = !turn.audioUrl;
+  updateVoiceUI();
+}
+
+function cleanupTurnAudio() {
+  if (turn.player) { turn.player.pause(); turn.player = null; }
+  revokeAudio(turn.audioUrl);
+  turn.audioUrl = null;
+}
+
+function cancelVoiceTurn() {
+  turn.manualStop = true;
+  clearTimeout(turn.silenceTimer);
+  if (turn.rec) {
+    turn.rec.onend = null;
+    try { turn.rec.stop(); } catch (_) {}
+    turn.rec = null;
+  }
+  if (turn.recorder) { turn.recorder.cancel(); turn.recorder = null; }
+  cleanupTurnAudio();
+  turn.finalText = "";
+  turn.interim = "";
+  turn.phase = "idle";
+  updateVoiceUI();
 }
 
 /* ================================================================ フィードバック */
@@ -449,7 +644,7 @@ async function finishTalk() {
     return;
   }
   speechSynthesis.cancel();
-  stopListening();
+  cancelVoiceTurn();
   loading(true, "AIコーチがフィードバックを作成中…");
   try {
     const fb = await api("/api/feedback", {
@@ -523,6 +718,7 @@ document.querySelectorAll(".bottom-nav button").forEach((b) =>
   b.addEventListener("click", async () => {
     speechSynthesis.cancel();
     stopListening();
+    cancelVoiceTurn();
     const nav = b.dataset.nav;
     if (nav === "home") { await loadHome(); show("home"); }
     else if (nav === "stats") { await loadHome(); show("stats"); }
@@ -561,7 +757,7 @@ $("btn-phrase-next").addEventListener("click", () => {
 
 $("btn-talk-back").addEventListener("click", async () => {
   speechSynthesis.cancel();
-  stopListening();
+  cancelVoiceTurn();
   if (state.scenario) show("intro");
   else { await loadHome(); show("home"); }
 });
@@ -570,7 +766,31 @@ $("mode-voice").addEventListener("click", () => {
   setVoiceMode(true);
 });
 $("mode-text").addEventListener("click", () => setVoiceMode(false));
-$("btn-talk-mic").addEventListener("click", toggleTalkMic);
+$("btn-talk-mic").addEventListener("click", () => {
+  if (turn.phase === "recording") finishVoiceTurn();
+  else startVoiceTurn();
+});
+$("btn-replay-self").addEventListener("click", () => {
+  if (!turn.audioUrl) return;
+  if (turn.player) turn.player.pause();
+  turn.player = new Audio(turn.audioUrl);
+  turn.player.play();
+});
+$("btn-redo").addEventListener("click", () => {
+  cancelVoiceTurn();
+  startVoiceTurn();
+});
+$("btn-send-voice").addEventListener("click", () => {
+  const text = (turn.finalText + turn.interim).trim();
+  cancelVoiceTurn(); // 音声はここで破棄（サーバーには送らない）
+  if (text) sendUserMessage(text);
+});
+$("btn-shadow-replay").addEventListener("click", () => {
+  if (!shadowAudioUrl) return;
+  if (shadowPlayer) shadowPlayer.pause();
+  shadowPlayer = new Audio(shadowAudioUrl);
+  shadowPlayer.play();
+});
 $("btn-send").addEventListener("click", () => {
   const input = $("chat-text");
   sendUserMessage(input.value);

@@ -81,6 +81,7 @@
       <div id="shadow-result" class="hidden">
         <div class="accuracy" id="shadow-accuracy"></div>
         <p class="recognized" id="shadow-recognized"></p>
+        <button class="btn-ghost-sm hidden" id="btn-shadow-replay">🔊 自分の発音を聞く</button>
       </div>
     </div>
     <div class="shadow-nav">
@@ -103,8 +104,18 @@
     <div class="talk-footer">
       <button class="btn-finish" id="btn-finish-talk">✔ 会話を終えてフィードバック</button>
       <div id="voice-input" class="voice-input">
+        <p class="live-transcript hidden" id="live-transcript"></p>
         <button class="btn-big-mic" id="btn-talk-mic">🎤</button>
         <p class="mic-hint" id="talk-hint">タップして話す</p>
+      </div>
+      <div id="voice-confirm" class="voice-confirm hidden">
+        <p class="confirm-label">この内容で送信しますか？</p>
+        <p class="confirm-text" id="confirm-text"></p>
+        <div class="confirm-actions">
+          <button id="btn-replay-self" class="btn-confirm">🔊<span>再生</span></button>
+          <button id="btn-redo" class="btn-confirm">🔄<span>やり直し</span></button>
+          <button id="btn-send-voice" class="btn-confirm primary">✅<span>送信</span></button>
+        </div>
       </div>
       <div id="text-input" class="text-input hidden">
         <input type="text" id="chat-text" placeholder="英語で入力…" autocomplete="off">

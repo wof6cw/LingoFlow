@@ -97,9 +97,9 @@ def chat(req: ChatRequest):
         if not scenario:
             raise HTTPException(404, "シナリオが見つかりません。")
         reply = gemini.roleplay_reply(scenario, messages, req.difficulty)
-    else:
-        reply = gemini.free_chat_reply(messages, req.difficulty)
-    return {"reply": reply}
+        return {"reply": reply, "reply_ja": None}
+    result = gemini.free_chat_reply(messages, req.difficulty)
+    return {"reply": result["english"], "reply_ja": result["japanese"]}
 
 
 @app.post("/api/feedback")
