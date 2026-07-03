@@ -15,6 +15,63 @@ from fastapi import HTTPException
 BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models"
 DEFAULT_MODEL = "gemini-2.5-flash"
 
+# 難易度ごとの生成調整。シナリオ×レベルの組み合わせは
+# このパラメータをプロンプトに埋め込むだけで実現する（個別執筆なし）。
+DIFFICULTY = {
+    "beginner": {
+        "label": "初級",
+        "cefr": "CEFR A2",
+        "speaking_style": (
+            "Use simple, high-frequency vocabulary and short sentences (roughly 10 "
+            "words or fewer). Avoid idioms and uncommon phrasal verbs. Speak clearly "
+            "and patiently, like talking to a beginner learner."
+        ),
+        "phrase_style": (
+            "Very common, simple expressions with basic sentence patterns, "
+            "4-9 words each. No idioms."
+        ),
+        "feedback_style": (
+            "初級者向け: 基本的な文法・語彙の誤りに絞って指摘し、特に優しく励ますトーンで。"
+            "細かい不自然さまでは指摘しすぎない。"
+        ),
+    },
+    "intermediate": {
+        "label": "中級",
+        "cefr": "CEFR B1-B2",
+        "speaking_style": (
+            "Use clear, natural phrasing at a standard conversational level. "
+            "Common idioms are fine if the meaning is guessable from context."
+        ),
+        "phrase_style": (
+            "Practical, high-frequency expressions, 5-14 words each. "
+            "No obscure idioms."
+        ),
+        "feedback_style": (
+            "中級者向け: 明確な誤りの修正に加えて、より自然な言い回しもバランスよく提案する。"
+        ),
+    },
+    "advanced": {
+        "label": "上級",
+        "cefr": "CEFR B2-C1",
+        "speaking_style": (
+            "Speak like a native at a natural pace: use idioms, phrasal verbs, and "
+            "indirect or nuanced phrasing where a native speaker naturally would."
+        ),
+        "phrase_style": (
+            "Natural, native-like expressions including useful idioms and "
+            "softening/hedging phrases, 5-16 words each."
+        ),
+        "feedback_style": (
+            "上級者向け: 誤りの修正よりも、よりネイティブらしい自然な言い回し・"
+            "ニュアンス・レジスター（丁寧さの度合い）の提案を重視する。"
+        ),
+    },
+}
+
+
+def _difficulty(key: str | None) -> dict:
+    return DIFFICULTY.get(key or "", DIFFICULTY["intermediate"])
+
 
 def _api_key() -> str:
     key = os.environ.get("GEMINI_API_KEY", "").strip()
@@ -83,7 +140,8 @@ def _user_turn(text: str) -> dict:
 
 # ---------------------------------------------------------------- シナリオ生成
 
-def generate_scenario_content(scenario: dict) -> dict:
+def generate_scenario_content(scenario: dict, difficulty: str = "intermediate") -> dict:
+    d = _difficulty(difficulty)
     system = (
         "You are a content generator for an English speaking practice app for a "
         "Japanese learner (TOEIC ~890, weak at speaking). Output JSON only."
@@ -94,21 +152,21 @@ Scenario: {scenario['title_en']}
 Situation: {scenario['situation']}
 Learner role: {scenario['user_role']}
 AI role: {scenario['ai_role']}
-Level: {scenario['level']} (初級 = CEFR A2-B1, 中級 = B1-B2)
+Learner level: {d['label']} ({d['cefr']})
 
 Return JSON with exactly this shape:
 {{
   "phrases": [
-    {{"en": "<key phrase the learner should master for this scenario, natural spoken English, 5-14 words>",
+    {{"en": "<key phrase the learner should master for this scenario, natural spoken English>",
       "ja": "<自然な日本語訳>"}}
   ],
-  "opening_line": "<the first thing the AI role would say to start the roleplay, 1-2 short sentences>"
+  "opening_line": "<the first thing the AI role would say to start the roleplay, 1-2 short sentences, matched to the learner level>"
 }}
 
 Rules:
 - Exactly 7 phrases, ordered roughly in the order they would come up in the conversation.
 - Phrases must be things the LEARNER (not the AI role) would say.
-- Practical, high-frequency expressions. No obscure idioms.
+- Phrase style for this level: {d['phrase_style']}
 """
     content = _parse_json(_generate(system, [_user_turn(prompt)], json_mode=True))
     if not isinstance(content.get("phrases"), list) or not content.get("opening_line"):
@@ -126,7 +184,9 @@ def _history_to_contents(messages: list[dict]) -> list[dict]:
     ]
 
 
-def roleplay_reply(scenario: dict, messages: list[dict]) -> str:
+def roleplay_reply(scenario: dict, messages: list[dict],
+                   difficulty: str = "intermediate") -> str:
+    d = _difficulty(difficulty)
     system = f"""You are playing a role in an English conversation practice roleplay.
 
 Your role: {scenario['ai_role']}
@@ -136,7 +196,8 @@ Situation: {scenario['situation']}
 Rules:
 - Stay in character. Natural spoken English only.
 - Keep every reply SHORT: 1-2 sentences. This is spoken conversation practice.
-- Level: {scenario['level']} learner (Japanese, TOEIC ~890 but weak at speaking). Use clear, natural phrasing.
+- Learner level: {d['label']} ({d['cefr']}), a Japanese learner (TOEIC ~890 but weak at speaking).
+- Language style for this level: {d['speaking_style']}
 - Do NOT correct the learner's mistakes during the conversation (feedback comes later). If a message is hard to understand, ask a natural clarifying question in character.
 - Move the scene forward with questions or new information so the learner keeps talking.
 - After about 8-10 exchanges, wrap the scene up naturally.
@@ -144,13 +205,15 @@ Rules:
     return _generate(system, _history_to_contents(messages)).strip()
 
 
-def free_chat_reply(messages: list[dict]) -> str:
-    system = """You are a friendly English conversation partner for a Japanese learner
+def free_chat_reply(messages: list[dict], difficulty: str = "intermediate") -> str:
+    d = _difficulty(difficulty)
+    system = f"""You are a friendly English conversation partner for a Japanese learner
 (TOEIC ~890, weak at speaking) practicing free conversation.
 
 Rules:
 - Natural spoken English only. Never use Japanese.
 - Keep every reply SHORT: 1-3 sentences, like a real chat.
+- Learner level: {d['label']} ({d['cefr']}). Language style: {d['speaking_style']}
 - Always end with a question or a hook so the learner keeps talking.
 - Do NOT correct mistakes during the conversation (feedback comes later).
 - Be warm, curious, and encouraging. Vary topics naturally."""
@@ -159,7 +222,9 @@ Rules:
 
 # ---------------------------------------------------------------- フィードバック
 
-def generate_feedback(scenario_title: str, messages: list[dict]) -> dict:
+def generate_feedback(scenario_title: str, messages: list[dict],
+                      difficulty: str = "intermediate") -> dict:
+    d = _difficulty(difficulty)
     transcript = "\n".join(
         f"{'AI' if m['role'] == 'ai' else 'Learner'}: {m['text']}" for m in messages
     )
@@ -168,7 +233,7 @@ def generate_feedback(scenario_title: str, messages: list[dict]) -> dict:
         "Analyze the learner's lines only. Output JSON only. "
         "All explanations must be in natural Japanese."
     )
-    prompt = f"""以下は英会話練習（{scenario_title}）の会話ログです。Learnerの発話を分析してください。
+    prompt = f"""以下は英会話練習（{scenario_title}、レベル: {d['label']}）の会話ログです。Learnerの発話を分析してください。
 
 {transcript}
 
@@ -193,6 +258,7 @@ Return JSON with exactly this shape:
 Rules:
 - corrections は明確な誤りのみ（最大5個）。誤りがなければ空配列。
 - better_expressions は最大3個。
+- レベルに応じた指摘方針: {d['feedback_style']}
 - 発話が少ない場合もその範囲で誠実に評価する。励ましのトーンを保つ。"""
     fb = _parse_json(_generate(system, [_user_turn(prompt)], json_mode=True))
     if "score" not in fb or "summary_ja" not in fb:

@@ -10,11 +10,16 @@ const state = {
   // 進行中のセッション
   scenario: null,      // null ならフリートーク
   content: null,       // { phrases, opening_line }
+  difficulty: "intermediate",
   phraseIndex: 0,
   messages: [],        // [{role: 'user'|'ai', text}]
   voiceMode: true,
   feedback: null,
 };
+
+const LEVEL_LABELS = { beginner: "初級", intermediate: "中級", advanced: "上級" };
+// 初級はお手本・AI音声をゆっくりめに再生する
+const TTS_RATES = { beginner: 0.8, intermediate: 0.95, advanced: 1.0 };
 
 /* ================================================================ API */
 
@@ -85,7 +90,7 @@ function speak(text, onend) {
   u.lang = "en-US";
   const v = pickEnglishVoice();
   if (v) u.voice = v;
-  u.rate = 0.95;
+  u.rate = TTS_RATES[state.difficulty] || 0.95;
   if (onend) { u.onend = onend; u.onerror = onend; }
   speechSynthesis.speak(u);
 }
@@ -179,7 +184,7 @@ function renderHome() {
         <div class="node-icon">${done ? "✔️" : sc.icon}</div>
         <div class="node-body">
           <b>${sc.title_ja}</b>
-          <div class="node-meta">${sc.title_en} ・ ${sc.level}</div>
+          <div class="node-meta">${sc.title_en} ・ ${LEVEL_LABELS[sc.level] || sc.level}</div>
         </div>
         ${done ? `<span class="node-check">${sc.completed_count}回クリア</span>` : `<span class="badge">未挑戦</span>`}`;
       node.addEventListener("click", () => openIntro(sc));
@@ -200,10 +205,11 @@ function renderHistory() {
     const sc = state.scenarios.find((s) => s.id === r.scenario_id);
     const title = sc ? sc.title_ja : "フリートーク";
     const icon = sc ? sc.icon : "💬";
+    const level = LEVEL_LABELS[r.difficulty] ? ` ・ ${LEVEL_LABELS[r.difficulty]}` : "";
     return `
       <div class="history-item">
         <span class="h-icon">${icon}</span>
-        <div class="h-body"><b>${title}</b><div class="h-date">${r.date}</div></div>
+        <div class="h-body"><b>${title}</b><div class="h-date">${r.date}${level}</div></div>
         ${r.score != null ? `<span class="h-score">${r.score}点</span>` : ""}
       </div>`;
   }).join("");
@@ -213,17 +219,27 @@ function renderHistory() {
 
 function openIntro(sc) {
   state.scenario = sc;
+  state.content = null;
+  state.difficulty = sc.level; // 推奨レベルを初期選択にする
   $("intro-title").textContent = sc.title_ja;
   $("intro-icon").textContent = sc.icon;
-  $("intro-level").textContent = `${sc.level} ・ ${sc.title_en}`;
+  $("intro-level").textContent = `おすすめ: ${LEVEL_LABELS[sc.level]} ・ ${sc.title_en}`;
   $("intro-desc").textContent = sc.description_ja;
+  renderLevelToggle();
   show("intro");
 }
 
+function renderLevelToggle() {
+  document.querySelectorAll("#level-toggle button").forEach((b) =>
+    b.classList.toggle("active", b.dataset.level === state.difficulty));
+}
+
 async function fetchContent() {
-  loading(true, "シナリオを準備中…（初回はAIが生成します）");
+  loading(true, "シナリオを準備中…（このレベルで初回はAIが生成します）");
   try {
-    const data = await api(`/api/scenarios/${state.scenario.id}/content`, { method: "POST" });
+    const data = await api(
+      `/api/scenarios/${state.scenario.id}/content?difficulty=${state.difficulty}`,
+      { method: "POST" });
     state.content = data.content;
     return true;
   } catch (e) {
@@ -321,6 +337,7 @@ async function startTalk({ free = false } = {}) {
   if (free) {
     state.scenario = null;
     state.content = null;
+    state.difficulty = "intermediate";
   }
   state.messages = [];
   $("chat-log").innerHTML = "";
@@ -377,6 +394,7 @@ async function sendUserMessage(text) {
       body: JSON.stringify({
         scenario_id: state.scenario?.id || null,
         messages: state.messages,
+        difficulty: state.difficulty,
       }),
     });
     typing.remove();
@@ -439,6 +457,7 @@ async function finishTalk() {
       body: JSON.stringify({
         scenario_id: state.scenario?.id || null,
         messages: state.messages,
+        difficulty: state.difficulty,
       }),
     });
     state.feedback = fb;
@@ -449,6 +468,7 @@ async function finishTalk() {
         mode: state.scenario ? "scenario" : "free_talk",
         score: fb.score,
         feedback: fb,
+        difficulty: state.difficulty,
       }),
     });
     state.stats = saved.stats;
@@ -510,6 +530,12 @@ document.querySelectorAll(".bottom-nav button").forEach((b) =>
   }));
 
 $("btn-free-talk").addEventListener("click", () => startTalk({ free: true }));
+document.querySelectorAll("#level-toggle button").forEach((b) =>
+  b.addEventListener("click", () => {
+    state.difficulty = b.dataset.level;
+    state.content = null; // レベルを変えたら内容は取り直す
+    renderLevelToggle();
+  }));
 $("btn-start-shadowing").addEventListener("click", startShadowing);
 $("btn-skip-to-talk").addEventListener("click", async () => {
   if (!(await fetchContent())) return;

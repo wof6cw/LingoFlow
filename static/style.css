@@ -110,6 +110,19 @@ body {
 .intro-card { text-align: center; }
 .intro-icon { font-size: 44px; margin-bottom: 6px; }
 .intro-card p { margin: 10px 0 16px; text-align: left; color: var(--text-sub); font-size: 14px; }
+.level-toggle {
+  display: flex; gap: 4px; background: var(--bg);
+  border: 1px solid var(--border); border-radius: 999px;
+  padding: 4px; margin-bottom: 16px;
+}
+.level-toggle button {
+  flex: 1; border: none; background: transparent; cursor: pointer;
+  padding: 8px 0; border-radius: 999px; font-size: 13px;
+  color: var(--text-sub);
+}
+.level-toggle button.active {
+  background: var(--green); color: #fff; font-weight: 700;
+}
 .intro-steps { text-align: left; margin-bottom: 18px; }
 .step {
   display: flex; align-items: center; gap: 10px; padding: 8px 0;
