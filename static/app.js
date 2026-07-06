@@ -38,14 +38,14 @@ async function api(path, options = {}) {
 
 /* ================================================================ 画面制御 */
 
-const VIEWS = ["home", "intro", "shadowing", "talk", "feedback", "stats"];
+const VIEWS = ["home", "intro", "shadowing", "talk", "feedback", "stats", "history-detail"];
 
 function show(view) {
   VIEWS.forEach((v) => $(`view-${v}`).classList.toggle("hidden", v !== view));
   document.querySelectorAll(".bottom-nav button").forEach((b) => {
     b.classList.toggle("active",
       (view === "home" && b.dataset.nav === "home") ||
-      (view === "stats" && b.dataset.nav === "stats") ||
+      ((view === "stats" || view === "history-detail") && b.dataset.nav === "stats") ||
       (view === "talk" && !state.scenario && b.dataset.nav === "free"));
   });
   window.scrollTo(0, 0);
@@ -201,11 +201,9 @@ async function loadHome() {
 function renderHome() {
   const h = new Date().getHours();
   $("greeting").textContent =
-    h < 5 ? "こんばんは！" : h < 11 ? "おはようございます！" : h < 18 ? "こんにちは！" : "こんばんは！";
+    h < 5 ? "こんばんは" : h < 11 ? "おはようございます" : h < 18 ? "こんにちは" : "こんばんは";
   const s = state.stats;
-  $("stat-streak").textContent = s.streak;
-  $("stat-today").textContent = s.today_sessions;
-  $("stat-total").textContent = s.total_sessions;
+  $("stat-line").textContent = `🔥 ${s.streak}日連続 ・ 通算${s.total_sessions}回`;
   $("stats2-streak").textContent = s.streak;
   $("stats2-today").textContent = s.today_sessions;
   $("stats2-total").textContent = s.total_sessions;
@@ -229,7 +227,7 @@ function renderHome() {
           <b>${sc.title_ja}</b>
           <div class="node-meta">${sc.title_en} ・ ${LEVEL_LABELS[sc.level] || sc.level}</div>
         </div>
-        ${done ? `<span class="node-check">${sc.completed_count}回クリア</span>` : `<span class="badge">未挑戦</span>`}`;
+        ${done ? `<span class="node-check">${sc.completed_count}回</span>` : `<span class="node-new">未挑戦</span>`}`;
       node.addEventListener("click", () => openIntro(sc));
       path.appendChild(node);
     }
@@ -244,18 +242,57 @@ function renderHistory() {
     list.innerHTML = `<p class="empty-note">まだ記録がありません。最初のセッションを始めましょう！</p>`;
     return;
   }
-  list.innerHTML = recent.map((r) => {
+  list.innerHTML = "";
+  for (const r of recent) {
     const sc = state.scenarios.find((s) => s.id === r.scenario_id);
     const title = sc ? sc.title_ja : "フリートーク";
     const icon = sc ? sc.icon : "💬";
     const level = LEVEL_LABELS[r.difficulty] ? ` ・ ${LEVEL_LABELS[r.difficulty]}` : "";
-    return `
-      <div class="history-item">
-        <span class="h-icon">${icon}</span>
-        <div class="h-body"><b>${title}</b><div class="h-date">${r.date}${level}</div></div>
-        ${r.score != null ? `<span class="h-score">${r.score}点</span>` : ""}
-      </div>`;
-  }).join("");
+    const item = document.createElement("div");
+    item.className = "history-item";
+    item.innerHTML = `
+      <span class="h-icon">${icon}</span>
+      <div class="h-body">
+        <b>${esc(title)}</b>
+        <div class="h-date">${r.date}${level}</div>
+        ${r.excerpt ? `<div class="h-excerpt">${esc(r.excerpt)}</div>` : ""}
+      </div>
+      ${r.score != null ? `<span class="h-score">${r.score}点</span>` : ""}`;
+    item.addEventListener("click", () => openHistoryDetail(r.id));
+    list.appendChild(item);
+  }
+}
+
+/* ================================================================ 過去セッションの全文閲覧 */
+
+async function openHistoryDetail(sessionId) {
+  loading(true, "読み込み中…");
+  try {
+    const session = await api(`/api/sessions/${sessionId}`);
+    const sc = state.scenarios.find((s) => s.id === session.scenario_id);
+    $("history-detail-title").textContent = sc ? sc.title_ja : "フリートーク";
+    const level = LEVEL_LABELS[session.difficulty] ? ` ・ ${LEVEL_LABELS[session.difficulty]}` : "";
+    $("history-detail-meta").textContent = `${session.date}${level}`;
+
+    const log = $("history-detail-log");
+    log.innerHTML = "";
+    for (const m of session.transcript) {
+      const div = document.createElement("div");
+      div.className = `bubble ${m.role}`;
+      div.textContent = m.text;
+      log.appendChild(div);
+    }
+
+    const fbEl = $("history-detail-feedback");
+    fbEl.innerHTML = "";
+    if (session.feedback) renderFeedbackInto(fbEl, session.feedback);
+
+    show("history-detail");
+  } catch (e) {
+    toast(e.message);
+  } finally {
+    loading(false);
+  }
 }
 
 /* ================================================================ シナリオ導入 */
@@ -277,11 +314,11 @@ function renderLevelToggle() {
     b.classList.toggle("active", b.dataset.level === state.difficulty));
 }
 
-async function fetchContent() {
-  loading(true, "シナリオを準備中…（このレベルで初回はAIが生成します）");
+async function fetchContent({ refresh = false } = {}) {
+  loading(true, refresh ? "新しい内容を生成中…" : "シナリオを準備中…（このレベルで初回はAIが生成します）");
   try {
     const data = await api(
-      `/api/scenarios/${state.scenario.id}/content?difficulty=${state.difficulty}`,
+      `/api/scenarios/${state.scenario.id}/content?difficulty=${state.difficulty}&refresh=${refresh}`,
       { method: "POST" });
     state.content = data.content;
     return true;
@@ -410,11 +447,11 @@ async function startTalk({ free = false } = {}) {
   show("talk");
 
   // 最初のAIの一言
-  if (state.scenario && state.content?.opening_line) {
-    addMessage("ai", state.content.opening_line);
-  } else if (state.scenario) {
+  if (state.scenario && !state.content) {
     if (!(await fetchContent())) { show("intro"); return; }
-    addMessage("ai", state.content.opening_line);
+  }
+  if (state.scenario) {
+    addMessage("ai", state.content.opening_line, state.content.opening_line_ja);
   } else {
     addMessage("ai", "Hi! Great to see you. What's on your mind today? 😊",
       "やあ！会えてうれしいです。今日はどんなことを話しましょうか？ 😊");
@@ -664,6 +701,7 @@ async function finishTalk() {
         score: fb.score,
         feedback: fb,
         difficulty: state.difficulty,
+        transcript: state.messages,
       }),
     });
     state.stats = saved.stats;
@@ -682,7 +720,7 @@ function esc(s) {
   return d.innerHTML;
 }
 
-function renderFeedback(fb) {
+function renderFeedbackInto(el, fb) {
   const corrections = (fb.corrections || []).map((c) => `
     <div class="fb-item">
       <div><span class="fb-original">${esc(c.original)}</span></div>
@@ -697,7 +735,7 @@ function renderFeedback(fb) {
     </div>`).join("");
   const good = (fb.good_points || []).map((g) => `<li>${esc(g)}</li>`).join("");
 
-  $("feedback-body").innerHTML = `
+  el.innerHTML = `
     <div class="card score-card">
       <div class="score-ring" style="--pct:${fb.score}"><b>${fb.score}</b><span>/ 100</span></div>
       <p style="font-size:14px; text-align:left;">${esc(fb.summary_ja)}</p>
@@ -707,6 +745,10 @@ function renderFeedback(fb) {
     ${better ? `<div class="card fb-section"><h3>💡 もっと自然な言い方</h3>${better}</div>` : ""}
     ${fb.fluency_comment_ja ? `<div class="card fb-section"><h3>🗣️ 流暢さ</h3><p style="font-size:13px;">${esc(fb.fluency_comment_ja)}</p></div>` : ""}
   `;
+}
+
+function renderFeedback(fb) {
+  renderFeedbackInto($("feedback-body"), fb);
 }
 
 /* ================================================================ イベント登録 */
@@ -736,6 +778,9 @@ $("btn-start-shadowing").addEventListener("click", startShadowing);
 $("btn-skip-to-talk").addEventListener("click", async () => {
   if (!(await fetchContent())) return;
   startTalk();
+});
+$("btn-regenerate-content").addEventListener("click", async () => {
+  if (await fetchContent({ refresh: true })) toast("新しい内容に作り直しました");
 });
 
 $("btn-listen").addEventListener("click", () =>

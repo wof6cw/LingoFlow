@@ -13,25 +13,15 @@
   <!-- ホーム -->
   <section id="view-home" class="view">
     <header class="home-header">
-      <div>
-        <h1 id="greeting">こんにちは！</h1>
-        <p class="sub">今日も英語を話しましょう</p>
-      </div>
+      <h1 id="greeting">こんにちは</h1>
+      <p class="stat-line" id="stat-line"></p>
     </header>
-    <div class="stat-row">
-      <div class="stat-chip"><span class="stat-icon">🔥</span><b id="stat-streak">0</b><span class="stat-label">日連続</span></div>
-      <div class="stat-chip"><span class="stat-icon">✅</span><b id="stat-today">0</b><span class="stat-label">今日</span></div>
-      <div class="stat-chip"><span class="stat-icon">📚</span><b id="stat-total">0</b><span class="stat-label">合計</span></div>
-    </div>
 
-    <div class="card free-talk-card" id="btn-free-talk" role="button" tabindex="0">
-      <div class="ft-icon">💬</div>
-      <div>
-        <b>AIフリートーク</b>
-        <p class="sub">好きな話題で自由に会話（音声・チャット両対応）</p>
-      </div>
+    <button class="talk-cta" id="btn-free-talk">
+      <span class="talk-cta-icon">💬</span>
+      <span class="talk-cta-label">フリートークを始める</span>
       <span class="chev">›</span>
-    </div>
+    </button>
 
     <h2 class="section-title">学習パス</h2>
     <div id="learning-path"></div>
@@ -53,12 +43,13 @@
         <button data-level="advanced">上級</button>
       </div>
       <div class="intro-steps">
-        <div class="step"><span class="step-num">1</span>シャドーイング<span class="step-note">重要フレーズを音読練習</span></div>
-        <div class="step"><span class="step-num">2</span>フリートーク<span class="step-note">AIとロールプレイ会話</span></div>
-        <div class="step"><span class="step-num">3</span>フィードバック<span class="step-note">文法・表現・流暢さを講評</span></div>
+        <div class="step"><span class="step-num">1</span>シャドーイング</div>
+        <div class="step"><span class="step-num">2</span>フリートーク</div>
+        <div class="step"><span class="step-num">3</span>フィードバック</div>
       </div>
       <button class="btn-primary" id="btn-start-shadowing">シャドーイングから始める</button>
       <button class="btn-ghost" id="btn-skip-to-talk">会話から始める（スキップ）</button>
+      <button class="btn-text-sm" id="btn-regenerate-content">🔄 新しい内容で作り直す</button>
     </div>
   </section>
 
@@ -145,8 +136,19 @@
     <div id="history-list"></div>
   </section>
 
-  <!-- ローディング / エラー -->
-  <div id="loading" class="overlay hidden"><div class="spinner"></div><p id="loading-text">読み込み中…</p></div>
+  <!-- 過去セッションの全文閲覧（読み返し専用） -->
+  <section id="view-history-detail" class="view hidden">
+    <header class="page-header">
+      <button class="btn-back" data-back="stats">‹</button>
+      <h1 id="history-detail-title"></h1>
+    </header>
+    <p class="history-detail-meta" id="history-detail-meta"></p>
+    <div id="history-detail-log"></div>
+    <div id="history-detail-feedback"></div>
+  </section>
+
+  <!-- ローディング（非ブロッキング：他の操作を妨げない） -->
+  <div id="loading" class="progress-pill hidden"><span class="spinner-sm"></span><span id="loading-text">読み込み中…</span></div>
   <div id="toast" class="toast hidden"></div>
 
   <!-- 下部ナビ -->

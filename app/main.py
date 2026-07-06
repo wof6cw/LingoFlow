@@ -55,6 +55,7 @@ class SessionRequest(BaseModel):
     score: int | None = None
     feedback: dict | None = None
     difficulty: str | None = Field(default=None, pattern=DIFFICULTY_PATTERN)
+    transcript: list[Message] | None = None
 
 
 @app.get("/api/scenarios")
@@ -96,9 +97,9 @@ def chat(req: ChatRequest):
         scenario = get_scenario(req.scenario_id)
         if not scenario:
             raise HTTPException(404, "シナリオが見つかりません。")
-        reply = gemini.roleplay_reply(scenario, messages, req.difficulty)
-        return {"reply": reply, "reply_ja": None}
-    result = gemini.free_chat_reply(messages, req.difficulty)
+        result = gemini.roleplay_reply(scenario, messages, req.difficulty)
+    else:
+        result = gemini.free_chat_reply(messages, req.difficulty)
     return {"reply": result["english"], "reply_ja": result["japanese"]}
 
 
@@ -115,8 +116,18 @@ def feedback(req: FeedbackRequest):
 
 @app.post("/api/sessions")
 def record_session(req: SessionRequest):
-    db.add_session(req.scenario_id, req.mode, req.score, req.feedback, req.difficulty)
-    return {"ok": True, "stats": db.get_stats()}
+    transcript = [m.model_dump() for m in req.transcript] if req.transcript else None
+    session_id = db.add_session(
+        req.scenario_id, req.mode, req.score, req.feedback, req.difficulty, transcript)
+    return {"ok": True, "session_id": session_id, "stats": db.get_stats()}
+
+
+@app.get("/api/sessions/{session_id}")
+def session_detail(session_id: int):
+    session = db.get_session(session_id)
+    if not session:
+        raise HTTPException(404, "セッションが見つかりません。")
+    return session
 
 
 @app.get("/api/stats")

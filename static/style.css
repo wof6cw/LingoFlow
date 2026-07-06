@@ -31,11 +31,11 @@ body {
 }
 
 .hidden { display: none !important; }
-.sub { color: var(--text-sub); font-size: 13px; }
 
 /* ---------- headers ---------- */
-.home-header { margin-bottom: 16px; }
-.home-header h1 { font-size: 22px; }
+.home-header { margin-bottom: 20px; }
+.home-header h1 { font-size: 22px; margin-bottom: 4px; }
+.stat-line { color: var(--text-sub); font-size: 13px; }
 .page-header {
   display: flex; align-items: center; gap: 10px; margin-bottom: 14px;
 }
@@ -49,56 +49,45 @@ body {
 
 .section-title { font-size: 15px; margin: 22px 0 10px; color: var(--text); }
 
-/* ---------- stat chips ---------- */
-.stat-row { display: flex; gap: 10px; margin-bottom: 16px; }
-.stat-chip {
-  flex: 1; background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 10px 8px;
-  display: flex; flex-direction: column; align-items: center;
-  box-shadow: var(--shadow);
-}
-.stat-chip b { font-size: 20px; }
-.stat-icon { font-size: 16px; }
-.stat-label { font-size: 11px; color: var(--text-sub); }
-
 /* ---------- cards ---------- */
 .card {
   background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow);
+  border-radius: var(--radius); padding: 18px;
 }
-.free-talk-card {
-  display: flex; align-items: center; gap: 14px; cursor: pointer;
-  background: linear-gradient(135deg, var(--green) 0%, var(--green-dark) 100%);
-  color: #fff; border: none;
+
+/* ---------- ホームの主役CTA（1画面1目的：フリートークへの単一導線） ---------- */
+.talk-cta {
+  width: 100%; display: flex; align-items: center; gap: 12px;
+  padding: 16px 18px; margin-bottom: 28px;
+  border: none; border-radius: var(--radius); cursor: pointer;
+  background: var(--green); color: #fff;
 }
-.free-talk-card .sub { color: rgba(255, 255, 255, 0.85); }
-.free-talk-card .ft-icon { font-size: 28px; }
-.free-talk-card .chev { margin-left: auto; font-size: 26px; opacity: 0.8; }
+.talk-cta-icon { font-size: 22px; }
+.talk-cta-label { font-size: 15px; font-weight: 700; flex: 1; text-align: left; }
+.talk-cta .chev { font-size: 22px; opacity: 0.85; }
 
 /* ---------- learning path ---------- */
 .path-category {
-  display: flex; align-items: center; gap: 8px;
-  font-size: 13px; color: var(--text-sub); margin: 18px 0 8px;
+  font-size: 12px; color: var(--text-muted); margin: 20px 0 6px;
+  text-transform: uppercase; letter-spacing: 0.04em;
 }
-.path-category::after { content: ""; flex: 1; height: 1px; background: var(--border); }
 .path-node {
   display: flex; align-items: center; gap: 14px;
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 14px; margin-bottom: 10px;
-  cursor: pointer; box-shadow: var(--shadow);
-  transition: transform 0.1s;
+  padding: 12px 2px; border-bottom: 1px solid var(--border);
+  cursor: pointer;
 }
-.path-node:active { transform: scale(0.98); }
+.path-node:active { opacity: 0.7; }
 .node-icon {
-  width: 48px; height: 48px; border-radius: 50%; flex-shrink: 0;
+  width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
-  font-size: 22px; background: var(--green-light);
+  font-size: 19px; background: var(--bg);
 }
-.path-node.done .node-icon { background: var(--green); }
+.path-node.done .node-icon { background: var(--green-light); }
 .node-body { flex: 1; min-width: 0; }
-.node-body b { font-size: 15px; }
-.node-meta { font-size: 12px; color: var(--text-sub); }
-.node-check { color: var(--green); font-weight: 700; font-size: 13px; white-space: nowrap; }
+.node-body b { font-size: 15px; font-weight: 500; }
+.node-meta { font-size: 12px; color: var(--text-muted); }
+.node-check { color: var(--green-dark); font-size: 12px; white-space: nowrap; }
+.node-new { color: var(--text-muted); font-size: 12px; white-space: nowrap; }
 
 .badge {
   display: inline-block; font-size: 11px; padding: 2px 10px;
@@ -148,6 +137,11 @@ body {
   border: 1px solid var(--border); border-radius: 999px;
   background: var(--surface); color: var(--text-sub);
   font-size: 14px; cursor: pointer;
+}
+.btn-text-sm {
+  display: block; width: 100%; padding: 10px; margin-top: 4px;
+  border: none; background: none; color: var(--text-muted);
+  font-size: 12.5px; cursor: pointer;
 }
 
 /* ---------- shadowing ---------- */
@@ -308,7 +302,16 @@ body {
 .history-item .h-body b { font-size: 14px; }
 .history-item .h-date { font-size: 11px; color: var(--text-muted); }
 .history-item .h-score { font-weight: 800; color: var(--green); }
+.history-item { cursor: pointer; }
+.history-item:active { opacity: 0.7; }
+.history-item .h-excerpt { font-size: 12px; color: var(--text-muted); margin-top: 1px; }
 .empty-note { color: var(--text-muted); font-size: 13px; text-align: center; padding: 24px 0; }
+
+/* ---------- history detail (読み返し専用) ---------- */
+.history-detail-meta { font-size: 13px; color: var(--text-sub); margin-bottom: 14px; }
+#history-detail-log { margin-bottom: 16px; }
+#history-detail-log .bubble.ai,
+#history-detail-log .bubble.user { cursor: default; }
 
 /* ---------- nav / overlay / toast ---------- */
 .bottom-nav {
@@ -325,14 +328,18 @@ body {
 .bottom-nav button span { font-size: 20px; }
 .bottom-nav button.active { color: var(--green-dark); font-weight: 700; }
 
-.overlay {
-  position: fixed; inset: 0; background: rgba(244, 247, 246, 0.85);
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 12px; z-index: 50; color: var(--text-sub); font-size: 14px;
+/* 生成中でも裏の画面操作をブロックしない非モーダルの進捗表示 */
+.progress-pill {
+  position: fixed; top: calc(14px + env(safe-area-inset-top)); left: 50%;
+  transform: translateX(-50%); z-index: 50; pointer-events: none;
+  display: flex; align-items: center; gap: 8px;
+  background: var(--text); color: #fff; font-size: 12.5px;
+  padding: 8px 16px; border-radius: 999px; box-shadow: var(--shadow);
+  max-width: 88%; text-align: center;
 }
-.spinner {
-  width: 40px; height: 40px; border-radius: 50%;
-  border: 4px solid var(--border); border-top-color: var(--green);
+.spinner-sm {
+  width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0;
+  border: 2px solid rgba(255, 255, 255, 0.35); border-top-color: #fff;
   animation: spin 0.8s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }

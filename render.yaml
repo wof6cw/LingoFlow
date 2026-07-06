@@ -8,5 +8,9 @@ services:
     envVars:
       - key: GEMINI_API_KEY
         sync: false   # Renderのダッシュボードで手入力する
+      - key: TURSO_DATABASE_URL
+        sync: false   # 未設定ならローカルSQLite（Render無料枠では再デプロイ時に消える）
+      - key: TURSO_AUTH_TOKEN
+        sync: false
       - key: PYTHON_VERSION
         value: 3.13.4

@@ -169,7 +169,8 @@ Return JSON with exactly this shape:
     {{"en": "<key phrase the learner should master for this scenario, natural spoken English>",
       "ja": "<自然な日本語訳>"}}
   ],
-  "opening_line": "<the first thing the AI role would say to start the roleplay, 1-2 short sentences, matched to the learner level>"
+  "opening_line": "<the first thing the AI role would say to start the roleplay, 1-2 short sentences, matched to the learner level>",
+  "opening_line_ja": "<opening_lineの自然な日本語訳>"
 }}
 
 Rules:
@@ -193,45 +194,17 @@ def _history_to_contents(messages: list[dict]) -> list[dict]:
     ]
 
 
-def roleplay_reply(scenario: dict, messages: list[dict],
-                   difficulty: str = "intermediate") -> str:
-    d = _difficulty(difficulty)
-    system = f"""You are playing a role in an English conversation practice roleplay.
-
-Your role: {scenario['ai_role']}
-The learner's role: {scenario['user_role']}
-Situation: {scenario['situation']}
-
-Rules:
-- Stay in character. Natural spoken English only.
-- Keep every reply SHORT: 1-2 sentences. This is spoken conversation practice.
-- Learner level: {d['label']} ({d['cefr']}), a Japanese learner (TOEIC ~890 but weak at speaking).
-- Language style for this level: {d['speaking_style']}
-- Do NOT correct the learner's mistakes during the conversation (feedback comes later). If a message is hard to understand, ask a natural clarifying question in character.
-- Move the scene forward with questions or new information so the learner keeps talking.
-- After about 8-10 exchanges, wrap the scene up naturally.
-- Never use Japanese. Never break character or mention that you are an AI."""
-    return _generate(system, _history_to_contents(messages)).strip()
+_TRANSLATED_REPLY_FORMAT = """
+Output format: JSON only, exactly this shape:
+{"english": "<your reply in English>", "japanese": "<そのreplyの自然な日本語訳>"}"""
 
 
-def free_chat_reply(messages: list[dict], difficulty: str = "intermediate") -> dict:
-    """フリートークの返答。英語の返答と日本語訳を1回の呼び出しで生成する。
+def _chat_reply(system: str, messages: list[dict]) -> dict:
+    """英語の返答と日本語訳を1回の呼び出しで生成する共通処理。
 
+    ロールプレイ・フリートーク両方の会話返答から呼ばれる。
     戻り値: {"english": str, "japanese": str | None}
     """
-    d = _difficulty(difficulty)
-    system = f"""You are a friendly English conversation partner for a Japanese learner
-(TOEIC ~890, weak at speaking) practicing free conversation.
-
-Rules for your reply:
-- Natural spoken English. Keep it SHORT: 1-3 sentences, like a real chat.
-- Learner level: {d['label']} ({d['cefr']}). Language style: {d['speaking_style']}
-- Always end with a question or a hook so the learner keeps talking.
-- Do NOT correct mistakes during the conversation (feedback comes later).
-- Be warm, curious, and encouraging. Vary topics naturally.
-
-Output format: JSON only, exactly this shape:
-{{"english": "<your reply in English>", "japanese": "<そのreplyの自然な日本語訳>"}}"""
     text = _generate(system, _history_to_contents(messages), json_mode=True)
     try:
         data = _parse_json(text)
@@ -243,6 +216,44 @@ Output format: JSON only, exactly this shape:
         return {"english": text.strip(), "japanese": None}
     japanese = str(data.get("japanese") or "").strip() or None
     return {"english": english, "japanese": japanese}
+
+
+def roleplay_reply(scenario: dict, messages: list[dict],
+                   difficulty: str = "intermediate") -> dict:
+    d = _difficulty(difficulty)
+    system = f"""You are playing a role in an English conversation practice roleplay.
+
+Your role: {scenario['ai_role']}
+The learner's role: {scenario['user_role']}
+Situation: {scenario['situation']}
+
+Rules:
+- Stay in character. Natural spoken English only in your "english" reply.
+- Keep every reply SHORT: 1-2 sentences. This is spoken conversation practice.
+- Learner level: {d['label']} ({d['cefr']}), a Japanese learner (TOEIC ~890 but weak at speaking).
+- Language style for this level: {d['speaking_style']}
+- Do NOT correct the learner's mistakes during the conversation (feedback comes later). If a message is hard to understand, ask a natural clarifying question in character.
+- Move the scene forward with questions or new information so the learner keeps talking.
+- After about 8-10 exchanges, wrap the scene up naturally.
+- Never break character or mention that you are an AI.
+{_TRANSLATED_REPLY_FORMAT}"""
+    return _chat_reply(system, messages)
+
+
+def free_chat_reply(messages: list[dict], difficulty: str = "intermediate") -> dict:
+    """フリートークの返答。英語の返答と日本語訳を1回の呼び出しで生成する。"""
+    d = _difficulty(difficulty)
+    system = f"""You are a friendly English conversation partner for a Japanese learner
+(TOEIC ~890, weak at speaking) practicing free conversation.
+
+Rules for your "english" reply:
+- Natural spoken English. Keep it SHORT: 1-3 sentences, like a real chat.
+- Learner level: {d['label']} ({d['cefr']}). Language style: {d['speaking_style']}
+- Always end with a question or a hook so the learner keeps talking.
+- Do NOT correct mistakes during the conversation (feedback comes later).
+- Be warm, curious, and encouraging. Vary topics naturally.
+{_TRANSLATED_REPLY_FORMAT}"""
+    return _chat_reply(system, messages)
 
 
 # ---------------------------------------------------------------- フィードバック

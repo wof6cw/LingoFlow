@@ -1,7 +1,13 @@
-"""SQLiteによる永続化。
+"""永続化層。ローカルではSQLiteファイル、本番ではTurso（libsql）を使う。
 
 - scenario_cache: Geminiが生成したシナリオ内容（フレーズ等）のキャッシュ
-- sessions: 練習履歴（ストリーク・統計の元データ）
+- sessions: 練習履歴（ストリーク・統計・会話全文の元データ）
+
+TURSO_DATABASE_URL / TURSO_AUTH_TOKEN が設定されていればTursoへ、
+未設定ならローカルのSQLiteファイル（DB_PATH）へ接続する。
+libsql_client.dbapi2.connect() はsqlite3.connect()とほぼ同じ
+インターフェースなので、クエリ本体はどちらの接続でも共通で書ける
+（ただしRow工場だけは接続先に応じて使い分ける必要がある）。
 
 日付はユーザーが日本在住のため Asia/Tokyo 基準で記録する
 （RenderのサーバーはUTCなので、そのままだと日付がずれる）。
@@ -14,8 +20,26 @@ from contextlib import contextmanager
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
+from libsql_client import dbapi2 as libsql
+
 DB_PATH = os.environ.get("DB_PATH", "lingoflow.db")
+TURSO_URL = os.environ.get("TURSO_DATABASE_URL", "").strip() or None
+TURSO_AUTH_TOKEN = os.environ.get("TURSO_AUTH_TOKEN", "").strip() or None
 JST = ZoneInfo("Asia/Tokyo")
+
+
+def using_turso() -> bool:
+    return TURSO_URL is not None
+
+
+def _connect():
+    if TURSO_URL:
+        conn = libsql.connect(TURSO_URL, auth_token=TURSO_AUTH_TOKEN)
+        conn.row_factory = libsql.Row
+    else:
+        conn = libsql.connect(DB_PATH)  # ローカルファイルは素のsqlite3.Connectionが返る
+        conn.row_factory = sqlite3.Row
+    return conn
 
 
 @contextmanager
@@ -25,8 +49,7 @@ def _conn():
     sqlite3の `with conn:` はコミットするだけでクローズしないため、
     明示的に close してWindowsのファイルロック残りや接続リークを防ぐ。
     """
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
+    conn = _connect()
     try:
         with conn:
             yield conn
@@ -34,7 +57,7 @@ def _conn():
         conn.close()
 
 
-def _columns(conn: sqlite3.Connection, table: str) -> list[str]:
+def _columns(conn, table: str) -> list[str]:
     return [r["name"] for r in conn.execute(f"PRAGMA table_info({table})")]
 
 
@@ -61,14 +84,18 @@ def init_db() -> None:
                 score       INTEGER,
                 feedback    TEXT,
                 difficulty  TEXT,
+                transcript  TEXT,
                 date_jst    TEXT NOT NULL,
                 created_at  TEXT NOT NULL
             );
             """
         )
-        # v1.0で作られた既存の履歴テーブルには difficulty 列を追加する（データは保持）
-        if "difficulty" not in _columns(conn, "sessions"):
+        # 既存テーブルへの追加カラム（データは保持したままマイグレーション）
+        session_cols = _columns(conn, "sessions")
+        if "difficulty" not in session_cols:
             conn.execute("ALTER TABLE sessions ADD COLUMN difficulty TEXT")
+        if "transcript" not in session_cols:
+            conn.execute("ALTER TABLE sessions ADD COLUMN transcript TEXT")
 
 
 def get_cached_content(scenario_id: str, difficulty: str) -> dict | None:
@@ -99,23 +126,44 @@ def clear_cached_content(scenario_id: str, difficulty: str) -> None:
 
 
 def add_session(scenario_id: str | None, mode: str, score: int | None,
-                feedback: dict | None, difficulty: str | None = None) -> None:
+                feedback: dict | None, difficulty: str | None = None,
+                transcript: list[dict] | None = None) -> int:
     now = datetime.now(JST)
     with _conn() as conn:
-        conn.execute(
+        cur = conn.execute(
             "INSERT INTO sessions "
-            "(scenario_id, mode, score, feedback, difficulty, date_jst, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "(scenario_id, mode, score, feedback, difficulty, transcript, date_jst, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 scenario_id,
                 mode,
                 score,
                 json.dumps(feedback, ensure_ascii=False) if feedback else None,
                 difficulty,
+                json.dumps(transcript, ensure_ascii=False) if transcript else None,
                 now.date().isoformat(),
                 now.isoformat(),
             ),
         )
+        return cur.lastrowid
+
+
+def get_session(session_id: int) -> dict | None:
+    with _conn() as conn:
+        row = conn.execute("SELECT * FROM sessions WHERE id = ?", (session_id,)).fetchone()
+    if not row:
+        return None
+    return {
+        "id": row["id"],
+        "scenario_id": row["scenario_id"],
+        "mode": row["mode"],
+        "score": row["score"],
+        "difficulty": row["difficulty"],
+        "feedback": json.loads(row["feedback"]) if row["feedback"] else None,
+        "transcript": json.loads(row["transcript"]) if row["transcript"] else [],
+        "date": row["date_jst"],
+        "created_at": row["created_at"],
+    }
 
 
 def _calc_streak(dates: list[str]) -> int:
@@ -133,6 +181,16 @@ def _calc_streak(dates: list[str]) -> int:
         streak += 1
         cursor -= timedelta(days=1)
     return streak
+
+
+def _excerpt(transcript_json: str | None, limit: int = 40) -> str | None:
+    if not transcript_json:
+        return None
+    messages = json.loads(transcript_json)
+    first_user = next((m["text"] for m in messages if m.get("role") == "user"), None)
+    if not first_user:
+        return None
+    return first_user if len(first_user) <= limit else first_user[:limit] + "…"
 
 
 def get_stats() -> dict:
@@ -157,15 +215,17 @@ def get_stats() -> dict:
         }
         recent = [
             {
+                "id": r["id"],
                 "scenario_id": r["scenario_id"],
                 "mode": r["mode"],
                 "score": r["score"],
                 "difficulty": r["difficulty"],
+                "excerpt": _excerpt(r["transcript"]),
                 "date": r["date_jst"],
                 "created_at": r["created_at"],
             }
             for r in conn.execute(
-                "SELECT * FROM sessions ORDER BY id DESC LIMIT 20"
+                "SELECT * FROM sessions ORDER BY id DESC LIMIT 30"
             )
         ]
     return {
