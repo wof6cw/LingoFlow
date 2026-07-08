@@ -59,6 +59,38 @@ function show(view) {
       (view === "talk" && !state.scenario && b.dataset.nav === "free"));
   });
   window.scrollTo(0, 0);
+  // 画面遷移のフェード＋スライドイン（クラス再付与のため一度リフローを挟む）
+  const el = $(`view-${view}`);
+  el.classList.remove("enter");
+  void el.offsetWidth;
+  el.classList.add("enter");
+}
+
+/* ================================================================ スクロール出現アニメーション */
+
+const revealObserver = new IntersectionObserver(
+  (entries) => {
+    for (const entry of entries) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add("in-view");
+        revealObserver.unobserve(entry.target);
+      }
+    }
+  },
+  { threshold: 0.12 }
+);
+
+/** 一覧を描画した直後に呼ぶ。子要素を順番にふわっと出現させる（スタガー演出）。 */
+function observeReveal(container, selector) {
+  const items = container.querySelectorAll(selector);
+  items.forEach((el, i) => {
+    el.classList.add("reveal");
+    el.style.transitionDelay = `${Math.min(i, 10) * 30}ms`;
+    revealObserver.observe(el);
+  });
+  container.querySelectorAll(".path-category, .phrase-group-title").forEach((el) => {
+    revealObserver.observe(el);
+  });
 }
 
 function loading(on, text) {
@@ -246,6 +278,7 @@ function renderHome() {
       path.appendChild(node);
     }
   }
+  observeReveal(path, ".path-node");
   renderHistory();
 }
 
@@ -273,6 +306,7 @@ function renderHistory() {
     item.addEventListener("click", () => openHistoryDetail(r.id));
     list.appendChild(item);
   }
+  observeReveal(list, ".history-item");
 }
 
 /* ================================================================ 表現集 */
@@ -331,6 +365,8 @@ async function loadPhrases() {
         seed.appendChild(phraseRow(item));
       }
     }
+    observeReveal(collected, ".phrase-item");
+    observeReveal(seed, ".phrase-item");
   } catch (e) {
     toast(e.message);
   } finally {
