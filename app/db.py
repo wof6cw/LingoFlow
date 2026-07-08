@@ -20,8 +20,6 @@ from contextlib import contextmanager
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from libsql_client import dbapi2 as libsql
-
 DB_PATH = os.environ.get("DB_PATH", "lingoflow.db")
 TURSO_URL = os.environ.get("TURSO_DATABASE_URL", "").strip() or None
 TURSO_AUTH_TOKEN = os.environ.get("TURSO_AUTH_TOKEN", "").strip() or None
@@ -34,10 +32,14 @@ def using_turso() -> bool:
 
 def _connect():
     if TURSO_URL:
+        # Turso使用時のみ読み込む。libsql_clientはPython 3.14未対応の内部importを
+        # 含むため、未使用の環境（Turso未設定）でアプリ全体が起動不能にならないよう
+        # 遅延importにしている。
+        from libsql_client import dbapi2 as libsql
         conn = libsql.connect(TURSO_URL, auth_token=TURSO_AUTH_TOKEN)
         conn.row_factory = libsql.Row
     else:
-        conn = libsql.connect(DB_PATH)  # ローカルファイルは素のsqlite3.Connectionが返る
+        conn = sqlite3.connect(DB_PATH)
         conn.row_factory = sqlite3.Row
     return conn
 
