@@ -90,6 +90,15 @@ def init_db() -> None:
                 date_jst    TEXT NOT NULL,
                 created_at  TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS expressions (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                en          TEXT NOT NULL UNIQUE,
+                note        TEXT,
+                source      TEXT NOT NULL,
+                scenario_id TEXT,
+                count       INTEGER NOT NULL DEFAULT 1,
+                created_at  TEXT NOT NULL
+            );
             """
         )
         # 既存テーブルへの追加カラム（データは保持したままマイグレーション）
@@ -125,6 +134,51 @@ def clear_cached_content(scenario_id: str, difficulty: str) -> None:
             "DELETE FROM scenario_cache WHERE scenario_id = ? AND difficulty = ?",
             (scenario_id, difficulty),
         )
+
+
+def get_cached_levels() -> dict[str, list[str]]:
+    """シナリオIDごとの生成済み難易度一覧（UIで「生成済み」を示すために使う）。"""
+    result: dict[str, list[str]] = {}
+    with _conn() as conn:
+        for r in conn.execute("SELECT scenario_id, difficulty FROM scenario_cache"):
+            result.setdefault(r["scenario_id"], []).append(r["difficulty"])
+    return result
+
+
+def upsert_expression(en: str, note: str | None, source: str,
+                      scenario_id: str | None) -> None:
+    """フィードバック由来の表現を蓄積する。同じ表現が再登場したら頻度を上げる。"""
+    now = datetime.now(JST).isoformat()
+    with _conn() as conn:
+        row = conn.execute(
+            "SELECT id FROM expressions WHERE en = ?", (en,)).fetchone()
+        if row:
+            conn.execute(
+                "UPDATE expressions SET count = count + 1, created_at = ? WHERE id = ?",
+                (now, row["id"]))
+        else:
+            conn.execute(
+                "INSERT INTO expressions (en, note, source, scenario_id, count, created_at) "
+                "VALUES (?, ?, ?, ?, 1, ?)",
+                (en, note, source, scenario_id, now))
+
+
+def get_expressions(limit: int = 200) -> list[dict]:
+    with _conn() as conn:
+        return [
+            {
+                "id": r["id"],
+                "en": r["en"],
+                "note": r["note"],
+                "source": r["source"],
+                "scenario_id": r["scenario_id"],
+                "count": r["count"],
+                "created_at": r["created_at"],
+            }
+            for r in conn.execute(
+                "SELECT * FROM expressions ORDER BY count DESC, id DESC LIMIT ?",
+                (limit,))
+        ]
 
 
 def add_session(scenario_id: str | None, mode: str, score: int | None,

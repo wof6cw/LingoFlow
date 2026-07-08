@@ -21,6 +21,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import db, gemini
+from .expressions import EXPRESSION_CATEGORIES
 from .scenarios import CATEGORIES, SCENARIOS, get_scenario
 
 app = FastAPI(title="LingoFlow")
@@ -61,10 +62,15 @@ class SessionRequest(BaseModel):
 @app.get("/api/scenarios")
 def list_scenarios():
     stats = db.get_stats()
+    cached = db.get_cached_levels()
     return {
         "categories": CATEGORIES,
         "scenarios": [
-            {**s, "completed_count": stats["completed_by_scenario"].get(s["id"], 0)}
+            {
+                **s,
+                "completed_count": stats["completed_by_scenario"].get(s["id"], 0),
+                "cached_levels": cached.get(s["id"], []),
+            }
             for s in sorted(SCENARIOS, key=lambda s: s["order"])
         ],
         "stats": stats,
@@ -114,12 +120,36 @@ def feedback(req: FeedbackRequest):
         title, [m.model_dump() for m in req.messages], req.difficulty)
 
 
+def _collect_expressions(feedback: dict, scenario_id: str | None) -> None:
+    """フィードバック中の修正・自然な言い回しを表現集に自動蓄積する。"""
+    for c in (feedback.get("corrections") or [])[:5]:
+        en = str(c.get("corrected") or "").strip()
+        if en:
+            db.upsert_expression(en, str(c.get("explanation_ja") or "").strip() or None,
+                                 "correction", scenario_id)
+    for b in (feedback.get("better_expressions") or [])[:3]:
+        en = str(b.get("improved") or "").strip()
+        if en:
+            db.upsert_expression(en, str(b.get("reason_ja") or "").strip() or None,
+                                 "better", scenario_id)
+
+
 @app.post("/api/sessions")
 def record_session(req: SessionRequest):
     transcript = [m.model_dump() for m in req.transcript] if req.transcript else None
     session_id = db.add_session(
         req.scenario_id, req.mode, req.score, req.feedback, req.difficulty, transcript)
+    if req.feedback:
+        try:
+            _collect_expressions(req.feedback, req.scenario_id)
+        except Exception:
+            pass  # 表現集への蓄積失敗でセッション記録自体は失敗させない
     return {"ok": True, "session_id": session_id, "stats": db.get_stats()}
+
+
+@app.get("/api/expressions")
+def expressions():
+    return {"categories": EXPRESSION_CATEGORIES, "collected": db.get_expressions()}
 
 
 @app.get("/api/sessions/{session_id}")
@@ -142,3 +172,17 @@ def index():
 
 
 app.mount("/", StaticFiles(directory=STATIC_DIR), name="static")
+
+
+@app.middleware("http")
+async def no_stale_static(request, call_next):
+    """静的ファイルは毎回ETagで再検証させる。
+
+    デプロイ後に古いapp.jsと新しいindex.htmlが混在すると
+    フロントが壊れるため（実際に起きた）、no-cacheで防ぐ。
+    ファイルが小さいので304検証のコストは無視できる。
+    """
+    response = await call_next(request)
+    if not request.url.path.startswith("/api"):
+        response.headers["Cache-Control"] = "no-cache"
+    return response

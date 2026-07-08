@@ -123,12 +123,14 @@ def _generate(system: str, contents: list[dict], json_mode: bool = False) -> str
             if resp.status_code in (429, 500, 503):
                 last_error = f"HTTP {resp.status_code} ({model})"
                 if attempt == 0:
-                    time.sleep(3)  # 少し待つと通ることが多い
+                    time.sleep(10)  # 少し待つと通ることが多い
                 continue  # 2回失敗したら次のモデルへ
             detail = resp.json().get("error", {}).get("message", resp.text[:200]) \
                 if resp.headers.get("content-type", "").startswith("application/json") \
                 else resp.text[:200]
             raise HTTPException(502, f"Gemini APIエラー (HTTP {resp.status_code}): {detail}")
+        
+        print(f"\n⚠️ すべてのモデルが全滅しました。最後のエラー: {last_error}\n")
 
     raise HTTPException(
         502, f"Gemini APIが混雑しています（{last_error}）。少し待って再試行してください。")

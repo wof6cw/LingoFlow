@@ -3,11 +3,34 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>LingoFlow — AIスピーキング練習</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎙️</text></svg>">
-<link rel="stylesheet" href="style.css">
+<title>LingoFlow</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%234A6B5D'/%3E%3Cg fill='%23C5A880'%3E%3Crect x='14' y='25' width='6' height='14' rx='3'/%3E%3Crect x='24' y='17' width='6' height='30' rx='3'/%3E%3Crect x='34' y='21' width='6' height='22' rx='3'/%3E%3Crect x='44' y='27' width='6' height='10' rx='3'/%3E%3C/g%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
+
+<!-- 共通アイコン定義（繊細なラインアート。絵文字は使わない） -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+  <symbol id="i-mic" viewBox="0 0 24 24"><path d="M12 3a3 3 0 0 1 3 3v5a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3z"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0"/><line x1="12" y1="17.5" x2="12" y2="21"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="1.5"/></symbol>
+  <symbol id="i-speaker" viewBox="0 0 24 24"><path d="M11 5 6.5 9H3v6h3.5L11 19V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="m21 3-7.5 18-3-8-8-3L21 3z"/><path d="M21 3 10.5 13"/></symbol>
+  <symbol id="i-redo" viewBox="0 0 24 24"><path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1L3.5 8.2"/><path d="M3.5 3.5v4.7h4.7"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 5 5 9-11"/></symbol>
+  <symbol id="i-right" viewBox="0 0 24 24"><path d="m9 5.5 6.5 6.5L9 18.5"/></symbol>
+  <symbol id="i-left" viewBox="0 0 24 24"><path d="M15 5.5 8.5 12 15 18.5"/></symbol>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="m3.5 10.5 8.5-7 8.5 7"/><path d="M5.5 9.5V20h13V9.5"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M20.5 11.5a8.5 8.5 0 1 0-16 4L3 21l5.6-1.4a8.5 8.5 0 0 0 11.9-8.1z"/></symbol>
+  <symbol id="i-stats" viewBox="0 0 24 24"><path d="M5 20v-7"/><path d="M12 20V5"/><path d="M19 20v-11"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24"><path d="M12 6.5C10 5 7 4.5 4 4.5v13.5c3 0 6 .5 8 2 2-1.5 5-2 8-2V4.5c-3 0-6 .5-8 2z"/><path d="M12 6.5V20"/></symbol>
+  <!-- カテゴリ用ラインアート -->
+  <symbol id="i-sprout" viewBox="0 0 24 24"><path d="M12 21v-8"/><path d="M12 13C12 9.5 9.5 7 5 7c0 4.5 2.5 6 7 6z"/><path d="M12 11c0-3.5 2.5-6.5 7-6.5 0 4.5-2.5 6.5-7 6.5z"/></symbol>
+  <symbol id="i-compass" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="m15 9-2 4.8L9 15l2-4.8L15 9z"/></symbol>
+  <symbol id="i-cup" viewBox="0 0 24 24"><path d="M5 8h11v5.5a5 5 0 0 1-5.5 5A5 5 0 0 1 5 13.5V8z"/><path d="M16 9.5h1.5a2.5 2.5 0 0 1 0 5H16"/><path d="M6.5 21.5h8"/></symbol>
+  <symbol id="i-case" viewBox="0 0 24 24"><rect x="4" y="8" width="16" height="11" rx="2"/><path d="M9 8V6.5A1.5 1.5 0 0 1 10.5 5h3A1.5 1.5 0 0 1 15 6.5V8"/><path d="M4 13h16"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 4.5 3 19.5h18L12 4.5z"/><line x1="12" y1="10.5" x2="12" y2="14"/><line x1="12" y1="16.5" x2="12" y2="16.6"/></symbol>
+</svg>
+
 <div id="app">
 
   <!-- ホーム -->
@@ -17,10 +40,9 @@
       <p class="stat-line" id="stat-line"></p>
     </header>
 
-    <button class="talk-cta" id="btn-free-talk">
-      <span class="talk-cta-icon">💬</span>
+    <button class="talk-cta fabric" id="btn-free-talk">
       <span class="talk-cta-label">フリートークを始める</span>
-      <span class="chev">›</span>
+      <svg class="icon"><use href="#i-right"/></svg>
     </button>
 
     <h2 class="section-title">学習パス</h2>
@@ -30,11 +52,10 @@
   <!-- シナリオ詳細 -->
   <section id="view-intro" class="view hidden">
     <header class="page-header">
-      <button class="btn-back" data-back="home">‹</button>
+      <button class="btn-back" data-back="home"><svg class="icon"><use href="#i-left"/></svg></button>
       <h1 id="intro-title"></h1>
     </header>
     <div class="card intro-card">
-      <div class="intro-icon" id="intro-icon"></div>
       <span class="badge" id="intro-level"></span>
       <p id="intro-desc"></p>
       <div class="level-toggle" id="level-toggle" aria-label="レベル選択">
@@ -42,21 +63,22 @@
         <button data-level="intermediate">中級</button>
         <button data-level="advanced">上級</button>
       </div>
+      <p class="cached-hint" id="cached-hint"></p>
       <div class="intro-steps">
         <div class="step"><span class="step-num">1</span>シャドーイング</div>
         <div class="step"><span class="step-num">2</span>フリートーク</div>
         <div class="step"><span class="step-num">3</span>フィードバック</div>
       </div>
-      <button class="btn-primary" id="btn-start-shadowing">シャドーイングから始める</button>
-      <button class="btn-ghost" id="btn-skip-to-talk">会話から始める（スキップ）</button>
-      <button class="btn-text-sm" id="btn-regenerate-content">🔄 新しい内容で作り直す</button>
+      <button class="btn-primary fabric" id="btn-start-shadowing">シャドーイングから始める</button>
+      <button class="btn-ghost" id="btn-skip-to-talk">会話から始める</button>
+      <button class="btn-text-sm hidden" id="btn-regenerate-content">新しい内容で作り直す</button>
     </div>
   </section>
 
   <!-- シャドーイング -->
   <section id="view-shadowing" class="view hidden">
     <header class="page-header">
-      <button class="btn-back" data-back="intro">‹</button>
+      <button class="btn-back" data-back="intro"><svg class="icon"><use href="#i-left"/></svg></button>
       <h1>シャドーイング</h1>
       <span class="progress-label" id="shadow-progress"></span>
     </header>
@@ -65,52 +87,55 @@
       <p class="phrase-en" id="phrase-en"></p>
       <p class="phrase-ja" id="phrase-ja"></p>
       <div class="phrase-actions">
-        <button class="btn-round" id="btn-listen" title="お手本を聞く">🔊</button>
-        <button class="btn-round btn-mic" id="btn-shadow-mic" title="発音する">🎤</button>
+        <button class="btn-round" id="btn-listen" title="お手本を聞く"><svg class="icon"><use href="#i-speaker"/></svg></button>
+        <button class="btn-round btn-mic fabric" id="btn-shadow-mic" title="発音する"><svg class="icon"><use href="#i-mic"/></svg></button>
       </div>
-      <p class="mic-hint" id="shadow-hint">🔊 でお手本を聞いて、🎤 を押して発音しましょう</p>
+      <p class="mic-hint" id="shadow-hint">お手本を聞いてから、マイクで発音しましょう</p>
       <div id="shadow-result" class="hidden">
         <div class="accuracy" id="shadow-accuracy"></div>
         <p class="recognized" id="shadow-recognized"></p>
-        <button class="btn-ghost-sm hidden" id="btn-shadow-replay">🔊 自分の発音を聞く</button>
+        <button class="btn-ghost-sm hidden" id="btn-shadow-replay">自分の発音を聞く</button>
       </div>
     </div>
     <div class="shadow-nav">
-      <button class="btn-ghost" id="btn-phrase-prev">‹ 前へ</button>
-      <button class="btn-primary" id="btn-phrase-next">次へ ›</button>
+      <button class="btn-ghost" id="btn-phrase-prev">前へ</button>
+      <button class="btn-primary fabric" id="btn-phrase-next">次へ</button>
     </div>
   </section>
 
   <!-- 会話（ロールプレイ / フリートーク） -->
   <section id="view-talk" class="view hidden">
     <header class="page-header">
-      <button class="btn-back" id="btn-talk-back">‹</button>
+      <button class="btn-back" id="btn-talk-back"><svg class="icon"><use href="#i-left"/></svg></button>
       <h1 id="talk-title"></h1>
       <div class="mode-toggle">
-        <button id="mode-voice" class="active">🎤 音声</button>
-        <button id="mode-text">⌨️ チャット</button>
+        <button id="mode-voice" class="active">音声</button>
+        <button id="mode-text">チャット</button>
       </div>
     </header>
     <div id="chat-log"></div>
     <div class="talk-footer">
-      <button class="btn-finish" id="btn-finish-talk">✔ 会話を終えてフィードバック</button>
+      <button class="btn-finish" id="btn-finish-talk">会話を終えてフィードバック</button>
       <div id="voice-input" class="voice-input">
         <p class="live-transcript hidden" id="live-transcript"></p>
-        <button class="btn-big-mic" id="btn-talk-mic">🎤</button>
+        <button class="btn-big-mic fabric" id="btn-talk-mic">
+          <svg class="icon" id="talk-mic-icon"><use href="#i-mic"/></svg>
+          <svg class="icon hidden" id="talk-stop-icon"><use href="#i-stop"/></svg>
+        </button>
         <p class="mic-hint" id="talk-hint">タップして話す</p>
       </div>
       <div id="voice-confirm" class="voice-confirm hidden">
         <p class="confirm-label">この内容で送信しますか？</p>
         <p class="confirm-text" id="confirm-text"></p>
         <div class="confirm-actions">
-          <button id="btn-replay-self" class="btn-confirm">🔊<span>再生</span></button>
-          <button id="btn-redo" class="btn-confirm">🔄<span>やり直し</span></button>
-          <button id="btn-send-voice" class="btn-confirm primary">✅<span>送信</span></button>
+          <button id="btn-replay-self" class="btn-confirm"><svg class="icon"><use href="#i-speaker"/></svg><span>再生</span></button>
+          <button id="btn-redo" class="btn-confirm"><svg class="icon"><use href="#i-redo"/></svg><span>やり直し</span></button>
+          <button id="btn-send-voice" class="btn-confirm primary fabric"><svg class="icon"><use href="#i-send"/></svg><span>送信</span></button>
         </div>
       </div>
       <div id="text-input" class="text-input hidden">
-        <input type="text" id="chat-text" placeholder="英語で入力…" autocomplete="off">
-        <button class="btn-send" id="btn-send">➤</button>
+        <input type="text" id="chat-text" placeholder="英語で入力" autocomplete="off">
+        <button class="btn-send fabric" id="btn-send"><svg class="icon"><use href="#i-send"/></svg></button>
       </div>
     </div>
   </section>
@@ -121,16 +146,28 @@
       <h1>フィードバック</h1>
     </header>
     <div id="feedback-body"></div>
-    <button class="btn-primary" id="btn-feedback-done">完了してホームへ</button>
+    <button class="btn-primary fabric" id="btn-feedback-done">完了してホームへ</button>
+  </section>
+
+  <!-- 表現集 -->
+  <section id="view-phrases" class="view hidden">
+    <header class="page-header"><h1>表現集</h1></header>
+    <p class="freq-legend">
+      <span class="freq-dots"><i></i><i></i><i></i></span> 最頻出
+      <span class="freq-dots"><i></i><i></i></span> よく使う
+      <span class="freq-dots"><i></i></span> 知っていると便利 ・ タップで発音
+    </p>
+    <div id="phrases-collected"></div>
+    <div id="phrases-seed"></div>
   </section>
 
   <!-- 記録 -->
   <section id="view-stats" class="view hidden">
     <header class="page-header"><h1>練習の記録</h1></header>
     <div class="stat-row">
-      <div class="stat-chip"><span class="stat-icon">🔥</span><b id="stats2-streak">0</b><span class="stat-label">日連続</span></div>
-      <div class="stat-chip"><span class="stat-icon">✅</span><b id="stats2-today">0</b><span class="stat-label">今日</span></div>
-      <div class="stat-chip"><span class="stat-icon">📚</span><b id="stats2-total">0</b><span class="stat-label">合計</span></div>
+      <div class="stat-chip"><b id="stats2-streak">0</b><span class="stat-label">日連続</span></div>
+      <div class="stat-chip"><b id="stats2-today">0</b><span class="stat-label">今日</span></div>
+      <div class="stat-chip"><b id="stats2-total">0</b><span class="stat-label">合計</span></div>
     </div>
     <h2 class="section-title">最近のセッション</h2>
     <div id="history-list"></div>
@@ -139,7 +176,7 @@
   <!-- 過去セッションの全文閲覧（読み返し専用） -->
   <section id="view-history-detail" class="view hidden">
     <header class="page-header">
-      <button class="btn-back" data-back="stats">‹</button>
+      <button class="btn-back" data-back="stats"><svg class="icon"><use href="#i-left"/></svg></button>
       <h1 id="history-detail-title"></h1>
     </header>
     <p class="history-detail-meta" id="history-detail-meta"></p>
@@ -148,16 +185,17 @@
   </section>
 
   <!-- ローディング（非ブロッキング：他の操作を妨げない） -->
-  <div id="loading" class="progress-pill hidden"><span class="spinner-sm"></span><span id="loading-text">読み込み中…</span></div>
+  <div id="loading" class="progress-pill hidden"><span class="spinner-sm"></span><span id="loading-text">読み込み中</span></div>
   <div id="toast" class="toast hidden"></div>
 
   <!-- 下部ナビ -->
   <nav class="bottom-nav">
-    <button data-nav="home" class="active"><span>🏠</span>ホーム</button>
-    <button data-nav="free"><span>💬</span>フリートーク</button>
-    <button data-nav="stats"><span>📈</span>記録</button>
+    <button data-nav="home" class="active"><svg class="icon"><use href="#i-home"/></svg>ホーム</button>
+    <button data-nav="free"><svg class="icon"><use href="#i-chat"/></svg>会話</button>
+    <button data-nav="phrases"><svg class="icon"><use href="#i-book"/></svg>表現集</button>
+    <button data-nav="stats"><svg class="icon"><use href="#i-stats"/></svg>記録</button>
   </nav>
 </div>
-<script src="app.js"></script>
+<script src="app.js?v=3"></script>
 </body>
 </html>

@@ -1,0 +1,140 @@
+"""汎用表現集のシードデータ。
+
+freq は使用頻度の目安: 3 = 最頻出（毎回の会話で使う）, 2 = よく使う, 1 = 知っていると便利。
+フィードバック由来の表現（ユーザー固有）はDBの expressions テーブルに自動蓄積され、
+このシードとは別枠で表示する。
+"""
+
+EXPRESSION_CATEGORIES = [
+    {
+        "id": "reactions",
+        "title_ja": "あいづち・リアクション",
+        "items": [
+            {"en": "That makes sense.", "ja": "なるほど、確かに。", "freq": 3},
+            {"en": "That sounds great.", "ja": "それいいですね。", "freq": 3},
+            {"en": "Oh, really?", "ja": "え、そうなんですか？", "freq": 3},
+            {"en": "I see what you mean.", "ja": "言いたいこと、わかります。", "freq": 2},
+            {"en": "Absolutely.", "ja": "まったくその通り。", "freq": 2},
+            {"en": "No way!", "ja": "うそでしょ！／まさか！", "freq": 2},
+            {"en": "That's interesting.", "ja": "それは興味深いですね。", "freq": 2},
+            {"en": "Kind of.", "ja": "まあ、そんな感じです。", "freq": 2},
+            {"en": "I was just about to say that.", "ja": "ちょうどそれを言おうとしてました。", "freq": 1},
+            {"en": "Tell me more about it.", "ja": "もっと詳しく聞かせてください。", "freq": 1},
+        ],
+    },
+    {
+        "id": "fillers",
+        "title_ja": "つなぎ・時間かせぎ",
+        "items": [
+            {"en": "Let me think for a second.", "ja": "ちょっと考えさせてください。", "freq": 3},
+            {"en": "That's a good question.", "ja": "いい質問ですね（考える時間かせぎに）。", "freq": 3},
+            {"en": "How should I put it...", "ja": "何と言えばいいかな…。", "freq": 2},
+            {"en": "Well, it's hard to say.", "ja": "うーん、何とも言えないですね。", "freq": 2},
+            {"en": "What's the word...", "ja": "あの単語、何だっけ…。", "freq": 2},
+            {"en": "You know what I mean?", "ja": "言いたいこと伝わってます？", "freq": 2},
+            {"en": "Where was I?", "ja": "どこまで話しましたっけ？", "freq": 1},
+            {"en": "Anyway, back to the topic.", "ja": "とにかく、話を戻すと。", "freq": 1},
+        ],
+    },
+    {
+        "id": "clarify",
+        "title_ja": "聞き返し・確認",
+        "items": [
+            {"en": "Sorry, could you say that again?", "ja": "すみません、もう一度言ってもらえますか？", "freq": 3},
+            {"en": "Could you speak a little slower?", "ja": "もう少しゆっくり話してもらえますか？", "freq": 3},
+            {"en": "What do you mean by that?", "ja": "それはどういう意味ですか？", "freq": 3},
+            {"en": "So you're saying ..., right?", "ja": "つまり…ということですよね？", "freq": 2},
+            {"en": "Sorry, I didn't catch that.", "ja": "すみません、聞き取れませんでした。", "freq": 2},
+            {"en": "Could you rephrase that?", "ja": "別の言い方で言ってもらえますか？", "freq": 2},
+            {"en": "How do you spell that?", "ja": "つづりはどう書きますか？", "freq": 1},
+            {"en": "Did you say fifteen or fifty?", "ja": "15と50、どちらと言いました？", "freq": 1},
+        ],
+    },
+    {
+        "id": "opinions",
+        "title_ja": "意見・気持ちを伝える",
+        "items": [
+            {"en": "I'd say ...", "ja": "私なら…と言うかな（控えめな意見）。", "freq": 3},
+            {"en": "To be honest, ...", "ja": "正直に言うと…。", "freq": 3},
+            {"en": "In my opinion, ...", "ja": "私の意見では…。", "freq": 2},
+            {"en": "It depends.", "ja": "場合によりますね。", "freq": 3},
+            {"en": "I'm not a big fan of ...", "ja": "…はあまり好きではないんです（婉曲）。", "freq": 2},
+            {"en": "I couldn't agree more.", "ja": "まったく同感です。", "freq": 2},
+            {"en": "I see your point, but ...", "ja": "おっしゃることはわかりますが…。", "freq": 2},
+            {"en": "I have mixed feelings about it.", "ja": "それには複雑な気持ちです。", "freq": 1},
+            {"en": "If I were you, I would ...", "ja": "私があなたなら…します。", "freq": 1},
+        ],
+    },
+    {
+        "id": "requests",
+        "title_ja": "お願い・許可",
+        "items": [
+            {"en": "Could I get ...?", "ja": "…をもらえますか？（注文などで万能）", "freq": 3},
+            {"en": "Would you mind helping me?", "ja": "手伝っていただけませんか？（丁寧）", "freq": 2},
+            {"en": "Is it okay if I ...?", "ja": "…してもいいですか？", "freq": 3},
+            {"en": "I was wondering if you could ...", "ja": "…していただけないかと思いまして（とても丁寧）。", "freq": 2},
+            {"en": "Do you mind if I open the window?", "ja": "窓を開けても構いませんか？", "freq": 2},
+            {"en": "Could you do me a favor?", "ja": "ひとつお願いしてもいいですか？", "freq": 2},
+            {"en": "Whenever you have time.", "ja": "お時間のあるときで構いません。", "freq": 1},
+        ],
+    },
+    {
+        "id": "social",
+        "title_ja": "感謝・謝罪・社交",
+        "items": [
+            {"en": "I really appreciate it.", "ja": "本当に感謝しています。", "freq": 3},
+            {"en": "Thanks a lot for your help.", "ja": "手伝ってくれて本当にありがとう。", "freq": 3},
+            {"en": "Sorry to bother you, but ...", "ja": "お忙しいところすみませんが…。", "freq": 2},
+            {"en": "My apologies for the confusion.", "ja": "混乱させてしまい申し訳ありません。", "freq": 1},
+            {"en": "No worries.", "ja": "気にしないでください。", "freq": 3},
+            {"en": "It was nice talking to you.", "ja": "お話しできてよかったです。", "freq": 2},
+            {"en": "Have a good one!", "ja": "よい一日を！（カジュアル）", "freq": 2},
+            {"en": "Long time no see!", "ja": "久しぶり！", "freq": 1},
+        ],
+    },
+    {
+        "id": "travel",
+        "title_ja": "旅行・外出先",
+        "items": [
+            {"en": "Do you have a table for two?", "ja": "2人ですが席はありますか？", "freq": 2},
+            {"en": "Can I get this to go?", "ja": "これ、持ち帰りにできますか？", "freq": 2},
+            {"en": "How do I get to the station?", "ja": "駅へはどう行けばいいですか？", "freq": 3},
+            {"en": "What do you recommend?", "ja": "おすすめは何ですか？", "freq": 3},
+            {"en": "Could we have the check, please?", "ja": "お会計をお願いします。", "freq": 2},
+            {"en": "Is this seat taken?", "ja": "この席、空いていますか？", "freq": 2},
+            {"en": "I have a reservation under Tanaka.", "ja": "タナカで予約しています。", "freq": 2},
+            {"en": "How long does it take on foot?", "ja": "歩いてどのくらいかかりますか？", "freq": 1},
+            {"en": "Could you take a picture of us?", "ja": "写真を撮っていただけますか？", "freq": 1},
+        ],
+    },
+    {
+        "id": "work",
+        "title_ja": "仕事・会議",
+        "items": [
+            {"en": "Let me get back to you on that.", "ja": "その件は確認して折り返します。", "freq": 3},
+            {"en": "Could you elaborate on that?", "ja": "その点、詳しく説明してもらえますか？", "freq": 2},
+            {"en": "I'll keep you posted.", "ja": "進捗があれば随時連絡します。", "freq": 2},
+            {"en": "From my perspective, ...", "ja": "私の立場から見ると…。", "freq": 2},
+            {"en": "Let's circle back to this later.", "ja": "この件は後でまた話しましょう。", "freq": 2},
+            {"en": "We're on the same page.", "ja": "認識は一致していますね。", "freq": 2},
+            {"en": "That works for me.", "ja": "私はそれで大丈夫です。", "freq": 3},
+            {"en": "Could we push the meeting back an hour?", "ja": "会議を1時間後ろ倒しにできますか？", "freq": 1},
+            {"en": "Just to clarify, ...", "ja": "念のため確認ですが…。", "freq": 2},
+            {"en": "Let me walk you through it.", "ja": "順を追って説明しますね。", "freq": 1},
+        ],
+    },
+    {
+        "id": "trouble",
+        "title_ja": "トラブル対応",
+        "items": [
+            {"en": "There seems to be a mistake.", "ja": "何かの間違いのようなのですが。", "freq": 2},
+            {"en": "This isn't what I ordered.", "ja": "注文したものと違います。", "freq": 2},
+            {"en": "Could you look into it?", "ja": "調べていただけますか？", "freq": 2},
+            {"en": "I'd like a refund, please.", "ja": "返金をお願いしたいのですが。", "freq": 1},
+            {"en": "My flight was cancelled. What are my options?", "ja": "便が欠航になりました。どんな選択肢がありますか？", "freq": 1},
+            {"en": "I left my bag on the train.", "ja": "電車にかばんを忘れました。", "freq": 1},
+            {"en": "It doesn't seem to be working.", "ja": "動かないみたいなのですが。", "freq": 2},
+            {"en": "I'm not feeling well.", "ja": "体調がよくありません。", "freq": 2},
+        ],
+    },
+]
